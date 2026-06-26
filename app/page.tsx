@@ -401,11 +401,16 @@ export default function Home() {
       </a>
 
       <header className="jt-header">
-        <div>
-          <h1 className="jt-title">ジチタイ</h1>
-          <p className="jt-subtitle">
-            {now ? `${jpDateLabel(now)} #${pNumber}` : "　"}
-          </p>
+        <div className="jt-brand">
+          <span className="jt-mark" aria-hidden="true">
+            <span>市</span>
+          </span>
+          <div className="jt-titles">
+            <h1 className="jt-title">ジチタイ</h1>
+            <p className="jt-subtitle">
+              {now ? `${jpDateLabel(now)} ・ #${pNumber}` : "　"}
+            </p>
+          </div>
         </div>
         <button
           type="button"
@@ -422,38 +427,47 @@ export default function Home() {
         tabIndex={-1}
         style={{ outline: "none", display: "contents" }}
       >
-        {/* シルエット */}
-        <section className="jt-silhouette-wrap" aria-labelledby="sil-h">
+        {/* シルエット（今日のお題ステージ） */}
+        <section
+          className="jt-stage"
+          aria-labelledby="sil-h"
+        >
           <h2 id="sil-h" className="jt-visually-hidden">
             今日のシルエット
           </h2>
-          <div
-            className={`jt-silhouette${status === "won" ? " is-correct" : ""}`}
-          >
-            {loadError ? (
-              <div role="alert" style={{ textAlign: "center" }}>
-                <p>お題を読み込めませんでした。</p>
-                <button
-                  type="button"
-                  className="jt-btn"
-                  onClick={() => {
-                    if (typeof location !== "undefined") location.reload();
-                  }}
+          <span className="jt-eyebrow">今日のお題</span>
+          <div className="jt-silhouette-wrap">
+            <div
+              className={`jt-silhouette${status === "won" ? " is-correct" : ""}`}
+            >
+              {loadError ? (
+                <div className="jt-stage-error" role="alert">
+                  <span className="jt-stage-error-icon" aria-hidden="true">
+                    !
+                  </span>
+                  <p>お題を読み込めませんでした。</p>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      if (typeof location !== "undefined") location.reload();
+                    }}
+                  >
+                    再読み込み
+                  </button>
+                </div>
+              ) : sil ? (
+                <svg
+                  viewBox={`0 0 ${sil.vb} ${sil.vb}`}
+                  role="img"
+                  aria-label="今日の市区町村のシルエット"
                 >
-                  再読み込み
-                </button>
-              </div>
-            ) : sil ? (
-              <svg
-                viewBox={`0 0 ${sil.vb} ${sil.vb}`}
-                role="img"
-                aria-label="今日の市区町村のシルエット"
-              >
-                <path d={sil.d} />
-              </svg>
-            ) : (
-              <div className="jt-skeleton" aria-label="本日のお題を準備中" />
-            )}
+                  <path d={sil.d} />
+                </svg>
+              ) : (
+                <div className="jt-skeleton" aria-label="本日のお題を準備中" />
+              )}
+            </div>
           </div>
 
           {/* ヒント（1段ずつ開示） */}
@@ -489,7 +503,7 @@ export default function Home() {
 
         {/* 入力 */}
         {status === "playing" && !loadError && (
-          <section aria-label="推測の入力">
+          <section className="jt-guess" aria-label="推測の入力">
             <div className="jt-inputrow">
               <input
                 className={`jt-input${inputError ? " is-error" : ""}`}
@@ -538,13 +552,27 @@ export default function Home() {
                 </ul>
               )}
             </div>
-            {inputError ? (
-              <p className="jt-errmsg" role="alert">
-                {inputError}
-              </p>
-            ) : (
-              <p className="jt-meta">残り{left}回</p>
-            )}
+            <div className="jt-input-foot">
+              {inputError ? (
+                <p className="jt-errmsg" role="alert">
+                  <span aria-hidden="true">⚠</span>
+                  {inputError}
+                </p>
+              ) : (
+                <span className="jt-tries">
+                  残り
+                  <span className="jt-pips" aria-hidden="true">
+                    {Array.from({ length: MAX_GUESSES }).map((_, i) => (
+                      <span
+                        key={i}
+                        className={`jt-pip${i < left ? " is-left" : ""}`}
+                      />
+                    ))}
+                  </span>
+                  {left}回
+                </span>
+              )}
+            </div>
             <div aria-live="polite" className="jt-visually-hidden">
               {listOpen && query
                 ? candidates.length > 0
@@ -554,8 +582,7 @@ export default function Home() {
             </div>
             <button
               type="button"
-              className="jt-share"
-              style={{ marginTop: "var(--sp-3)" }}
+              className="btn btn-primary btn-lg jt-submit"
               onClick={commitGuess}
               disabled={submitDisabled}
             >
@@ -570,16 +597,25 @@ export default function Home() {
         {/* 結果（読み上げは専用 live region に一本化。countdown の毎秒読み上げを避けるため
             この section には aria-live を付けない） */}
         {status !== "playing" && answer && (
-          <section className="jt-result">
+          <section
+            className={`jt-result${status === "won" ? " is-won" : ""}`}
+          >
+            <span className="jt-result-emoji" aria-hidden="true">
+              {status === "won" ? "🎉" : "🗺️"}
+            </span>
             <h2>
               {status === "won"
-                ? `正解！ ${answer.n}（${guesses.length}回）`
-                : `正解は ${answer.n} でした`}
+                ? `正解！ ${answer.n}`
+                : `正解は ${answer.n}`}
             </h2>
-            <p className="jt-meta" style={{ margin: 0 }}>
-              {answer.p}・{answer.r}
+            <p className="jt-result-sub">
+              {status === "won"
+                ? `${guesses.length}回で当たりました ・ ${answer.p}・${answer.r}`
+                : `${answer.p}・${answer.r} ・ また明日チャレンジ！`}
             </p>
-            <p className="jt-countdown">次のお題まで {countdown}</p>
+            <p className="jt-countdown">
+              次のお題まで <b>{countdown}</b>
+            </p>
           </section>
         )}
 
@@ -627,7 +663,12 @@ export default function Home() {
         {/* 共有 */}
         {status !== "playing" && (
           <section>
-            <button type="button" className="jt-share" onClick={onShare}>
+            <button
+              type="button"
+              className="btn btn-primary btn-lg jt-submit"
+              onClick={onShare}
+            >
+              <span aria-hidden="true">📤</span>
               結果を共有する
             </button>
           </section>
@@ -709,7 +750,7 @@ export default function Home() {
             <p>方角は矢印（↑北 ↗北東 →東 …）で、正解の方向を指します。</p>
             <button
               type="button"
-              className="jt-btn jt-btn-primary"
+              className="btn btn-primary btn-lg jt-modal-cta"
               onClick={dismissHelp}
             >
               はじめる

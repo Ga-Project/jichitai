@@ -1,195 +1,353 @@
-/* ジチタイ — 製品テーマ & ゲームUI
- * デザイン仕様（和モダン・墨+藍）を CSS 変数で実装。プレーンCSSのみ（output:export 両立）。
- * 近接フィードバックは「輝度＋寒暖の二重符号化＋数値%＋バー長」で色覚多様性に依存しない。
+/* jichitai — per-product テーマ層（製品の "顔" をここで作る）
+ *
+ * globals.css は共通の構造・a11y・コンポーネント挙動を持つ "出発点"。
+ * このファイルは globals.css の後に読み込まれ、:root トークンを上書きして
+ * このゲーム固有の個性（色・温度感・形・密度）を与え、さらにゲーム専用の
+ * コンポーネント（シルエット盤・推測入力・ヒント・近接フィードバック・結果）を足す。
+ *
+ * ■ この製品の世界観
+ *   「毎日ひらく地図探検。今日のシルエットは何市？ ── 当てた瞬間の高揚感」。
+ *   地図上の発見ピン・鳥居の朱・お祭りの灯りを思わせる、明るく親しみやすい朱色を主役に、
+ *   紙の地図のような暖かいオフホワイト地を敷く。角は大きめに丸めて毎日触りたくなる柔らかさを、
+ *   差し色のマリーゴールド（装飾専用）で「今日の発見」のきらめきを添える。
+ *   主役はあくまでシルエットと推測UI。世界観は色と光で出し、機能の邪魔をしない。
+ *
+ * ■ アクセシビリティ（出荷前検証済み・全て WCAG AA 以上 / light・dark 双方）
+ *   light: accent(h18 s80% l40%) vs white 5.39 / accent vs bg 5.30 / text-dim vs bg 5.13
+ *   dark : accent(持ち上げ後) vs bg 8.10 / accent-fg(ink) vs accent 7.88
+ *   近接フィードバックは「輝度の段階 ＋ 寒暖の色相 ＋ 数値% ＋ バー長 ＋ 左罫の太さ」で
+ *   多重符号化し、色覚特性に依存しない（各帯は light/dark でも面に対し ≥3:1）。
+ *   マリーゴールドの差し色は装飾（hero の光・きらめき）専用で、文字には使わない。
+ *
+ * ■ 思想: 構造クラス（.btn / .card / .badge / .alert …）の見た目は個別に
+ *   書き換えず、トークンで個性を出す。ゲーム固有の UI だけを下で定義する。
  */
 
 :root {
-  /* 色（ライト） */
-  --bg: #faf8f3;
-  --surface: #ffffff;
-  --surface-2: #f1ede4;
-  --fg: #1c1b19;
-  --text: #1c1b19;
-  --fg-muted: #6b675e;
-  --text-dim: #6b675e;
-  --border: #e0dacb;
-  --accent: #2c5f8a;
-  --accent-hover: #244e72;
+  /* ===== accent: 地図の発見ピン・鳥居の朱（HSL を 1 か所で定義・tint/shade は globals が自動派生） ===== */
+  --accent-h: 18;
+  --accent-s: 80%;
+  --accent-l: 40%;
   --accent-fg: #ffffff;
-  --silhouette: #2b2a26;
-  --silhouette-bg: #ffffff;
-  --focus: #a85f12;
-  --focus-ring: #a85f12;
-  --danger: #b23a2e;
-  --err: #b23a2e;
 
-  /* 近接帯（P1 遠い 〜 P5 正解） */
-  --prox-1: #b05a4e;
-  --prox-2: #d98a45;
-  --prox-3: #e0b84c;
-  --prox-4: #7fb069;
-  --prox-5: #1b7f4b;
+  /* ===== neutral: 紙の地図のような暖かいオフホワイト ===== */
+  --neutral-hue: 28;
+  --neutral-chroma: 14%;
 
-  /* タイポ */
-  --font-sans:
-    "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP",
-    "Yu Gothic Medium", Meiryo, system-ui, sans-serif;
+  /* ===== 形・密度: 大きめの角丸＝毎日触りたくなる柔らかさ・ゲームらしい親しみ ===== */
+  --radius-sm: 12px;
+  --radius: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 30px;
+  --density: 1.02;
 
-  /* 余白・形状 */
-  --sp-1: 4px;
-  --sp-2: 8px;
-  --sp-3: 12px;
-  --sp-4: 16px;
-  --sp-5: 24px;
-  --sp-6: 32px;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-pill: 999px;
-  --shadow-card: 0 1px 3px rgba(28, 27, 25, 0.08), 0 4px 16px rgba(28, 27, 25, 0.04);
-  --container-max: 440px;
-  --tap-min: 44px;
+  /* ===== 差し色: 今日の発見のきらめき（装飾専用・非テキスト） ===== */
+  --spotlight: hsl(40 92% 52%);
+  --spotlight-soft: hsl(40 92% 52% / 0.18);
+
+  /* ===== シルエット盤（地図の紙・墨の輪郭） ===== */
+  --sil-ink: hsl(28 16% 16%);
+  --sil-paper: hsl(36 42% 99%);
+
+  /* ===== 近接フィードバック帯（遠い P1 → 正解 P5。輝度段階＋寒暖で多重符号化） ===== */
+  --prox-1: #b0473a; /* 遠い   ・くすんだ朱 */
+  --prox-2: #cf7a2e; /* やや遠い・橙 */
+  --prox-3: #b88a12; /* 近い   ・金 */
+  --prox-4: #5f8f2a; /* とても近い・若草 */
+  --prox-5: #157a3f; /* 正解／極近・深緑 */
+  --prox-1-tint: hsl(8 52% 94%);
+  --prox-5-tint: hsl(150 44% 92%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #16181d;
-    --surface: #1f232b;
-    --surface-2: #272c36;
-    --fg: #eceae4;
-    --text: #eceae4;
-    --fg-muted: #9a9588;
-    --text-dim: #9a9588;
-    --border: #363b45;
-    --accent: #5b9bd0;
-    --accent-hover: #6fa9d8;
-    --accent-fg: #0e1116;
-    --silhouette: #d8d5cc;
-    --silhouette-bg: #1f232b;
-    --focus: #e8a84c;
-    --focus-ring: #e8a84c;
-    --danger: #e5867a;
-    --err: #e5867a;
+    /* dark accent は globals がトークンで持ち上げる。ここでは装飾・ゲーム固有のみ再定義。 */
+    --spotlight: hsl(42 94% 60%);
+    --spotlight-soft: hsl(42 94% 60% / 0.16);
+
+    --sil-ink: hsl(34 14% 90%);
+    --sil-paper: hsl(28 18% 13%);
+
     --prox-1: #c76e62;
-    --prox-2: #e59a57;
-    --prox-3: #ecc75e;
-    --prox-4: #93c47d;
-    --prox-5: #2e9e63;
+    --prox-2: #e09a57;
+    --prox-3: #d8b84e;
+    --prox-4: #86b85a;
+    --prox-5: #3aa863;
+    --prox-1-tint: hsl(8 36% 18%);
+    --prox-5-tint: hsl(150 32% 16%);
   }
 }
 
-* {
-  box-sizing: border-box;
-}
-
-body {
-  background: var(--bg);
-  color: var(--fg);
-  font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: 1.6;
-  margin: 0;
-}
-
-:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
+/* =========================================================================
+ * アプリの器: 1 カラム・中央寄せ。地図探検のステージ。
+ * ========================================================================= */
 .jt-app {
-  max-width: var(--container-max);
-  margin: 0 auto;
-  padding: var(--sp-4);
-  min-height: 100vh;
+  max-width: 30rem;
+  margin-inline: auto;
+  padding: var(--sp-4) var(--sp-5) var(--sp-12);
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
+  gap: var(--sp-5);
 }
 
-/* ヘッダ */
+/* 全体に薄く敷く地図テクスチャ＋発見の光（装飾・aria 非対象） */
+.jt-app::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      52% 38% at 50% -4%,
+      hsl(var(--accent-h) var(--accent-s) 56% / 0.12),
+      transparent 70%
+    ),
+    radial-gradient(40% 30% at 92% 8%, var(--spotlight-soft), transparent 72%);
+}
+
+/* =========================================================================
+ * ヘッダー: ブランド＋日付＋遊び方
+ * ========================================================================= */
 .jt-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: var(--sp-2);
+  gap: var(--sp-3);
+}
+.jt-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+/* ピン形のブランドマーク（地図の発見ピン） */
+.jt-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  flex: none;
+  border-radius: 50% 50% 50% 4px;
+  transform: rotate(-45deg);
+  background: linear-gradient(
+    140deg,
+    var(--accent),
+    hsl(calc(var(--accent-h) + 14) var(--accent-s) calc(var(--accent-l) + 8%))
+  );
+  box-shadow: var(--shadow-accent);
+}
+.jt-mark span {
+  transform: rotate(45deg);
+  color: var(--accent-fg);
+  font-weight: var(--fw-black);
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.jt-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
 .jt-title {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.3;
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-black);
+  letter-spacing: var(--tracking-snug);
+  line-height: 1.1;
   margin: 0;
 }
 .jt-subtitle {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--fg-muted);
-  margin: 2px 0 0;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--text-dim);
+  letter-spacing: var(--tracking-snug);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
 }
 .jt-iconbtn {
-  min-width: var(--tap-min);
-  min-height: var(--tap-min);
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: var(--surface);
-  color: var(--fg);
-  border-radius: var(--radius-pill);
-  font-size: 18px;
+  color: var(--text-soft);
+  font-size: 1.15rem;
+  font-weight: var(--fw-bold);
   cursor: pointer;
+  box-shadow: var(--shadow-xs);
+  transition:
+    background var(--transition),
+    color var(--transition),
+    border-color var(--transition),
+    transform var(--transition);
 }
 .jt-iconbtn:hover {
   background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
 }
 
-/* シルエット */
+/* =========================================================================
+ * hero: 今日のお題ステージ（シルエット盤を主役に据える作り込み）
+ * ========================================================================= */
+.jt-stage {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-6) var(--sp-4) var(--sp-5);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+/* ステージ背面のグリッド（緯線経線のような地図感・極薄・装飾） */
+.jt-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 38px 38px;
+  mask-image: radial-gradient(75% 70% at 50% 36%, #000 0%, transparent 78%);
+  -webkit-mask-image: radial-gradient(75% 70% at 50% 36%, #000 0%, transparent 78%);
+  opacity: 0.55;
+}
+.jt-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.jt-eyebrow::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--spotlight);
+  box-shadow: 0 0 0 4px var(--spotlight-soft);
+}
+
+/* シルエット盤 = 紙の地図に押された墨の輪郭 */
 .jt-silhouette-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--sp-3);
+  gap: var(--sp-4);
+  width: 100%;
 }
 .jt-silhouette {
+  position: relative;
   width: 100%;
   max-width: 320px;
-  aspect-ratio: 4 / 3;
-  background: var(--silhouette-bg);
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
+  background: var(--sil-paper);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   padding: var(--sp-5);
-  box-shadow: var(--shadow-card);
-}
-@media (min-width: 768px) {
-  .jt-silhouette {
-    max-width: 360px;
-  }
+  box-shadow:
+    var(--shadow-sm),
+    inset 0 0 0 1px hsl(var(--neutral-hue) 30% 100% / 0.6);
 }
 .jt-silhouette svg {
   width: 100%;
   height: 100%;
   display: block;
+  filter: drop-shadow(0 6px 14px hsl(var(--shadow-color) / 0.18));
 }
 .jt-silhouette path {
-  fill: var(--silhouette);
+  fill: var(--sil-ink);
 }
 .jt-silhouette.is-correct {
-  animation: jt-pop 400ms ease-out;
+  border-color: var(--prox-5);
+  box-shadow:
+    0 0 0 3px var(--prox-5-tint),
+    var(--shadow);
+  animation: jt-pop 480ms var(--ease);
 }
 @keyframes jt-pop {
   0% { transform: scale(1); }
-  50% { transform: scale(1.03); }
+  45% { transform: scale(1.045); }
   100% { transform: scale(1); }
 }
+/* シルエット読み込み中の skeleton（globals の .skeleton 作法に合わせる） */
 .jt-skeleton {
-  width: 100%;
-  height: 100%;
-  border-radius: var(--radius-md);
+  width: 86%;
+  height: 86%;
+  border-radius: var(--radius);
   background: var(--surface-2);
-  animation: jt-pulse 1.2s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
 }
-@keyframes jt-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+.jt-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--neutral-hue) 30% 100% / 0.55),
+    transparent
+  );
+  transform: translateX(-100%);
+  animation: skeleton-shimmer 1.4s var(--ease) infinite;
+}
+@media (prefers-color-scheme: dark) {
+  .jt-skeleton::after {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--neutral-hue) 20% 100% / 0.06),
+      transparent
+    );
+  }
 }
 
-/* ヒント */
+/* シルエット盤内のエラー状態（globals の .empty-state 思想を踏襲） */
+.jt-stage-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  text-align: center;
+  color: var(--text-dim);
+}
+.jt-stage-error .jt-stage-error-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius);
+  background: var(--err-tint);
+  color: var(--err);
+  font-size: 1.4rem;
+}
+.jt-stage-error p {
+  margin: 0;
+  color: var(--text-soft);
+}
+
+/* =========================================================================
+ * ヒント: 1 段ずつ開示するチップ
+ * ========================================================================= */
 .jt-hints {
   display: flex;
   flex-wrap: wrap;
@@ -197,91 +355,259 @@ body {
   justify-content: center;
 }
 .jt-hint {
-  min-height: 40px;
-  padding: 0 var(--sp-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 38px;
+  padding: 0 var(--sp-4);
   border-radius: var(--radius-pill);
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--fg-muted);
-  font-size: 14px;
+  border: 1px dashed var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
   cursor: pointer;
+  transition:
+    background var(--transition),
+    color var(--transition),
+    border-color var(--transition),
+    transform var(--transition);
+}
+.jt-hint::before {
+  content: "?";
+  display: inline-grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+}
+.jt-hint:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text);
+  transform: translateY(-1px);
 }
 .jt-hint.is-open {
-  background: var(--surface-2);
-  color: var(--fg);
-  font-weight: 600;
+  border-style: solid;
+  border-color: transparent;
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.jt-hint.is-open::before {
+  content: "✓";
+  background: var(--accent);
+  color: var(--accent-fg);
 }
 .jt-hint:disabled {
-  opacity: 0.45;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* 入力・候補 */
+/* =========================================================================
+ * 推測入力: combobox ＋ 候補リスト
+ * ========================================================================= */
+.jt-guess {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
 .jt-inputrow {
   position: relative;
 }
 .jt-input {
   width: 100%;
-  height: 48px;
-  font-size: 16px; /* iOS自動ズーム防止のため16px以上必須 */
+  min-height: 52px;
+  font: inherit;
+  font-size: 16px; /* iOS 自動ズーム防止に 16px 以上 */
+  font-weight: var(--fw-medium);
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
   padding: 0 var(--sp-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  color: var(--fg);
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition),
+    background var(--transition);
+}
+.jt-input:hover:not(:disabled) {
+  border-color: var(--border-strong);
 }
 .jt-input:focus {
+  outline: none;
   border-color: var(--accent);
+  background: var(--bg);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 .jt-input.is-error {
-  border-color: var(--danger);
+  border-color: var(--err);
+}
+.jt-input.is-error:focus {
+  box-shadow: 0 0 0 3px hsl(4 78% 50% / 0.25);
 }
 .jt-input:disabled {
   background: var(--surface-2);
-  color: var(--fg-muted);
+  color: var(--text-dim);
+  cursor: progress;
 }
-.jt-errmsg {
-  color: var(--danger);
-  font-size: 12px;
-  margin: var(--sp-1) 0 0;
+.jt-input::placeholder {
+  color: var(--text-dim);
+  font-weight: var(--fw-normal);
 }
-.jt-meta {
-  color: var(--fg-muted);
-  font-size: 12px;
-  margin: var(--sp-1) 0 0;
-}
+
 .jt-listbox {
   list-style: none;
-  margin: var(--sp-1) 0 0;
+  margin: var(--sp-2) 0 0;
   padding: var(--sp-1);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-lg);
   position: absolute;
   left: 0;
   right: 0;
   z-index: 20;
+  overflow: hidden;
 }
 .jt-option {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--sp-3);
   min-height: 48px;
   padding: 0 var(--sp-3);
   border-radius: var(--radius-sm);
   cursor: pointer;
+  font-weight: var(--fw-medium);
 }
 .jt-option[aria-selected="true"],
 .jt-option:hover {
-  background: var(--surface-2);
+  background: var(--accent-tint);
+  color: var(--accent);
 }
 .jt-option .pref {
-  color: var(--fg-muted);
-  font-size: 13px;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-normal);
+}
+.jt-option[aria-selected="true"] .pref,
+.jt-option:hover .pref {
+  color: var(--accent);
 }
 
-/* 推測履歴（CLS防止に6行ぶん確保） */
+.jt-input-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: 1.2rem;
+}
+.jt-errmsg {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--err);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  margin: 0;
+}
+.jt-meta {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  margin: 0;
+}
+/* 残り回数を玉で可視化（数字に依らず一目で残量がわかる） */
+.jt-tries {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--text-soft);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+.jt-pips {
+  display: inline-flex;
+  gap: 4px;
+}
+.jt-pip {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+}
+.jt-pip.is-left {
+  background: var(--accent);
+  border-color: transparent;
+}
+
+/* 推測ボタンは globals の .btn .btn-primary .btn-lg を使用（幅だけ全幅に） */
+.jt-submit {
+  width: 100%;
+}
+
+/* =========================================================================
+ * 結果カード（勝敗）
+ * ========================================================================= */
+.jt-result {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-6) var(--sp-5);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.jt-result.is-won {
+  background:
+    radial-gradient(120% 100% at 50% 0%, var(--prox-5-tint), transparent 70%),
+    var(--surface);
+  border-color: transparent;
+  box-shadow:
+    0 0 0 1px var(--prox-5-tint),
+    var(--shadow);
+}
+.jt-result-emoji {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+.jt-result h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+}
+.jt-result-sub {
+  color: var(--text-soft);
+  font-size: var(--fs-sm);
+  margin: 0;
+}
+.jt-countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.jt-countdown b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* =========================================================================
+ * 推測履歴（6 行ぶん確保・CLS 防止）
+ * ========================================================================= */
 .jt-history {
   list-style: none;
   margin: 0;
@@ -292,13 +618,14 @@ body {
 }
 .jt-row {
   border: 1px solid var(--border);
-  border-left-width: 4px;
-  border-radius: var(--radius-md);
+  border-left-width: 5px;
+  border-radius: var(--radius);
   background: var(--surface);
-  padding: var(--sp-2) var(--sp-3);
-  min-height: 56px;
-  font-feature-settings: "tnum";
-  animation: jt-rowin 180ms ease-out;
+  padding: var(--sp-3) var(--sp-4);
+  min-height: 64px;
+  box-shadow: var(--shadow-xs);
+  font-variant-numeric: tabular-nums;
+  animation: jt-rowin 220ms var(--ease);
 }
 @keyframes jt-rowin {
   from { opacity: 0; transform: translateY(8px); }
@@ -308,6 +635,7 @@ body {
   background: transparent;
   border-style: dashed;
   border-left-color: var(--border);
+  box-shadow: none;
   animation: none;
 }
 .jt-row-top {
@@ -317,36 +645,44 @@ body {
   gap: var(--sp-3);
 }
 .jt-row .name {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-bold);
 }
-.jt-row .dist,
+.jt-row .dist {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-soft);
+}
 .jt-row .dir {
-  font-size: 15px;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: 1.15rem;
+  font-weight: var(--fw-bold);
 }
 .jt-row .dir .dirlabel {
-  font-size: 12px;
-  color: var(--fg-muted);
-  margin-left: 2px;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--text-dim);
 }
 .jt-bar {
-  height: 8px;
+  height: 9px;
   border-radius: var(--radius-pill);
   background: var(--surface-2);
-  margin-top: var(--sp-2);
+  margin-top: var(--sp-3);
   overflow: hidden;
 }
 .jt-bar > span {
   display: block;
   height: 100%;
   border-radius: var(--radius-pill);
-  transition: width 300ms ease-out;
+  transition: width 360ms var(--ease);
 }
 .jt-prox {
-  font-size: 13px;
-  color: var(--fg-muted);
-  margin-top: 2px;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  font-weight: var(--fw-semibold);
+  margin-top: var(--sp-1);
 }
 .p1 { border-left-color: var(--prox-1); }
 .p2 { border-left-color: var(--prox-2); }
@@ -359,124 +695,155 @@ body {
 .bar4 { background: var(--prox-4); }
 .bar5 { background: var(--prox-5); }
 
-/* 結果・共有 */
-.jt-result {
-  text-align: center;
-  padding: var(--sp-3);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
-}
-.jt-result h2 {
-  font-size: 18px;
-  margin: 0 0 var(--sp-1);
-}
-.jt-countdown {
-  font-size: 13px;
-  color: var(--fg-muted);
-  font-feature-settings: "tnum";
-}
-.jt-share {
-  width: 100%;
-  min-height: 52px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: var(--accent);
-  color: var(--accent-fg);
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.jt-share:hover {
-  background: var(--accent-hover);
-}
-
-/* フッタ */
+/* =========================================================================
+ * フッター（出典表記）
+ * ========================================================================= */
 .jt-footer {
   margin-top: auto;
-  padding-top: var(--sp-4);
+  padding-top: var(--sp-5);
   border-top: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--fg-muted);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
   text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
 }
-.jt-footer a {
-  color: var(--accent);
+.jt-footer p {
+  margin: 0;
 }
 
-/* モーダル */
+/* =========================================================================
+ * モーダル（遊び方 / オンボーディング）
+ * ========================================================================= */
 .jt-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: hsl(var(--neutral-hue) 30% 8% / 0.5);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--sp-4);
-  z-index: 50;
+  z-index: 60;
+  animation: jt-fade 160ms var(--ease);
+}
+@keyframes jt-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .jt-modal {
-  max-width: 420px;
+  max-width: 27rem;
   width: 100%;
-  background: var(--surface);
-  color: var(--fg);
-  border-radius: var(--radius-lg);
-  padding: var(--sp-5);
-  box-shadow: var(--shadow-card);
   max-height: 90vh;
   overflow: auto;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-6);
+  box-shadow: var(--shadow-lg);
+  animation: jt-modalin 220ms var(--ease);
+}
+@keyframes jt-modalin {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .jt-modal h2 {
-  margin-top: 0;
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-lg);
+}
+.jt-modal ol {
+  margin: var(--sp-4) 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.jt-modal ol li {
+  position: relative;
+  padding-left: calc(1.75rem + var(--sp-3));
+  margin: 0;
+  min-height: 1.75rem;
+  display: flex;
+  align-items: center;
+}
+.jt-modal ol li::before {
+  counter-increment: jt-steps;
+  content: counter(jt-steps);
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--accent-tint);
+  color: var(--accent);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+}
+.jt-modal {
+  counter-reset: jt-steps;
+}
+.jt-modal p {
+  color: var(--text-soft);
 }
 .jt-legend {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-1);
-  margin: var(--sp-3) 0;
+  gap: var(--sp-2);
+  margin: var(--sp-3) 0 var(--sp-5);
+  padding: var(--sp-4);
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+}
+.jt-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--text-soft);
 }
 .jt-legend .swatch {
   display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  margin-right: var(--sp-2);
-  vertical-align: -2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  flex: none;
+}
+.jt-modal-cta {
+  width: 100%;
+  margin-top: var(--sp-2);
 }
 
-/* トースト */
+/* =========================================================================
+ * トースト
+ * ========================================================================= */
 .jt-toast {
   position: fixed;
   left: 50%;
-  bottom: 24px;
+  bottom: calc(var(--sp-6) + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
-  background: var(--fg);
+  background: var(--text);
   color: var(--bg);
-  padding: var(--sp-2) var(--sp-4);
+  padding: var(--sp-3) var(--sp-5);
   border-radius: var(--radius-pill);
-  font-size: 14px;
-  z-index: 60;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  box-shadow: var(--shadow-lg);
+  z-index: 70;
+  animation: jt-toastin 200ms var(--ease);
+}
+@keyframes jt-toastin {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }
 
-.jt-btn {
-  min-height: var(--tap-min);
-  padding: 0 var(--sp-4);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--fg);
-  font-size: 15px;
-  cursor: pointer;
-}
-.jt-btn-primary {
-  background: var(--accent);
-  color: var(--accent-fg);
-  border-color: var(--accent);
-  font-weight: 600;
-}
-
+/* =========================================================================
+ * SR 専用
+ * ========================================================================= */
 .jt-visually-hidden {
   position: absolute;
   width: 1px;
@@ -489,12 +856,17 @@ body {
   border: 0;
 }
 
+/* reduced-motion: globals 側でも抑制済みだが、ゲーム固有の transform 演出も止める */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
+  .jt-silhouette.is-correct,
+  .jt-row,
+  .jt-modal,
+  .jt-modal-backdrop,
+  .jt-toast {
+    animation: none !important;
+  }
+  .jt-iconbtn:hover,
+  .jt-hint:hover:not(:disabled) {
+    transform: none !important;
   }
 }
