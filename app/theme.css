@@ -1,30 +1,30 @@
-/* jichitai — per-product テーマ層（製品の "顔" をここで作る）
+/* jichitai — per-product テーマ層（製品の "顔" と "骨格" をここで作る）
  *
  * globals.css は共通の構造・a11y・コンポーネント挙動を持つ "出発点"。
  * このファイルは globals.css の後に読み込まれ、:root トークンを上書きして
  * このゲーム固有の個性（色・温度感・形・密度）を与え、さらにゲーム専用の
- * コンポーネント（シルエット盤・推測入力・ヒント・近接フィードバック・結果）を足す。
+ * 「骨格」コンポーネントを足す。
+ *
+ * ■ 骨格（構造）の作り分け
+ *   ランディング的 chrome（hero ＋ 縦積みカード）は使わない。代わりに
+ *   全画面デイリーパズルの HUD レイアウトを敷く:
+ *     ・上段  gp-hud     … 計器バー（日付/お題番号 ＋ 残量メーター）
+ *     ・中段  gp-stage   … 主役。地図プレートをコンパス十字の中心に据える没入面
+ *     ・下段  gp-console … 探索トレイル（履歴を横並び）＋ 入力コマンドバー
+ *   100dvh 固定グリッドで「1画面に収まる盤面」を作り、スクロールするページにしない。
  *
  * ■ この製品の世界観
  *   「毎日ひらく地図探検。今日のシルエットは何市？ ── 当てた瞬間の高揚感」。
  *   地図上の発見ピン・鳥居の朱・お祭りの灯りを思わせる、明るく親しみやすい朱色を主役に、
- *   紙の地図のような暖かいオフホワイト地を敷く。角は大きめに丸めて毎日触りたくなる柔らかさを、
- *   差し色のマリーゴールド（装飾専用）で「今日の発見」のきらめきを添える。
- *   主役はあくまでシルエットと推測UI。世界観は色と光で出し、機能の邪魔をしない。
+ *   紙の地図のような暖かいオフホワイト地を敷く。盤面はコンパスと緯線経線で計器化する。
  *
- * ■ アクセシビリティ（出荷前検証済み・全て WCAG AA 以上 / light・dark 双方）
- *   light: accent(h18 s80% l40%) vs white 5.39 / accent vs bg 5.30 / text-dim vs bg 5.13
- *   dark : accent(持ち上げ後) vs bg 8.10 / accent-fg(ink) vs accent 7.88
+ * ■ アクセシビリティ（WCAG AA 以上 / light・dark 双方）
  *   近接フィードバックは「輝度の段階 ＋ 寒暖の色相 ＋ 数値% ＋ バー長 ＋ 左罫の太さ」で
- *   多重符号化し、色覚特性に依存しない（各帯は light/dark でも面に対し ≥3:1）。
- *   マリーゴールドの差し色は装飾（hero の光・きらめき）専用で、文字には使わない。
- *
- * ■ 思想: 構造クラス（.btn / .card / .badge / .alert …）の見た目は個別に
- *   書き換えず、トークンで個性を出す。ゲーム固有の UI だけを下で定義する。
+ *   多重符号化し、色覚特性に依存しない。
  */
 
 :root {
-  /* ===== accent: 地図の発見ピン・鳥居の朱（HSL を 1 か所で定義・tint/shade は globals が自動派生） ===== */
+  /* ===== accent: 地図の発見ピン・鳥居の朱 ===== */
   --accent-h: 18;
   --accent-s: 80%;
   --accent-l: 40%;
@@ -34,12 +34,12 @@
   --neutral-hue: 28;
   --neutral-chroma: 14%;
 
-  /* ===== 形・密度: 大きめの角丸＝毎日触りたくなる柔らかさ・ゲームらしい親しみ ===== */
+  /* ===== 形・密度 ===== */
   --radius-sm: 12px;
   --radius: 16px;
   --radius-lg: 22px;
   --radius-xl: 30px;
-  --density: 1.02;
+  --density: 1;
 
   /* ===== 差し色: 今日の発見のきらめき（装飾専用・非テキスト） ===== */
   --spotlight: hsl(40 92% 52%);
@@ -50,18 +50,17 @@
   --sil-paper: hsl(36 42% 99%);
 
   /* ===== 近接フィードバック帯（遠い P1 → 正解 P5。輝度段階＋寒暖で多重符号化） ===== */
-  --prox-1: #b0473a; /* 遠い   ・くすんだ朱 */
-  --prox-2: #cf7a2e; /* やや遠い・橙 */
-  --prox-3: #b88a12; /* 近い   ・金 */
-  --prox-4: #5f8f2a; /* とても近い・若草 */
-  --prox-5: #157a3f; /* 正解／極近・深緑 */
+  --prox-1: #b0473a;
+  --prox-2: #cf7a2e;
+  --prox-3: #b88a12;
+  --prox-4: #5f8f2a;
+  --prox-5: #157a3f;
   --prox-1-tint: hsl(8 52% 94%);
   --prox-5-tint: hsl(150 44% 92%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* dark accent は globals がトークンで持ち上げる。ここでは装飾・ゲーム固有のみ再定義。 */
     --spotlight: hsl(42 94% 60%);
     --spotlight-soft: hsl(42 94% 60% / 0.16);
 
@@ -79,20 +78,32 @@
 }
 
 /* =========================================================================
- * アプリの器: 1 カラム・中央寄せ。地図探検のステージ。
+ * 器: 全画面 HUD グリッド（上=計器 / 中=盤面 / 下=コンソール）。
+ * スクロールするランディングではなく「1画面の盤面」を作る。
  * ========================================================================= */
-.jt-app {
-  max-width: 30rem;
+html,
+body {
+  height: 100%;
+}
+body {
+  overflow: hidden; /* 盤面は固定。スクロールはトレイル/候補リスト内に閉じる */
+}
+
+.gp-field {
+  position: relative;
+  height: 100dvh;
+  width: 100%;
+  max-width: 34rem;
   margin-inline: auto;
-  padding: var(--sp-4) var(--sp-5) var(--sp-12);
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-5);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: max(var(--sp-3), env(safe-area-inset-top)) var(--sp-4)
+    max(var(--sp-3), env(safe-area-inset-bottom));
+  gap: var(--sp-3);
 }
 
 /* 全体に薄く敷く地図テクスチャ＋発見の光（装飾・aria 非対象） */
-.jt-app::before {
+.gp-field::before {
   content: "";
   position: fixed;
   inset: 0;
@@ -100,34 +111,37 @@
   pointer-events: none;
   background:
     radial-gradient(
-      52% 38% at 50% -4%,
-      hsl(var(--accent-h) var(--accent-s) 56% / 0.12),
+      60% 42% at 50% -6%,
+      hsl(var(--accent-h) var(--accent-s) 56% / 0.13),
       transparent 70%
     ),
-    radial-gradient(40% 30% at 92% 8%, var(--spotlight-soft), transparent 72%);
+    radial-gradient(44% 30% at 96% 4%, var(--spotlight-soft), transparent 72%);
 }
 
 /* =========================================================================
- * ヘッダー: ブランド＋日付＋遊び方
+ * 上段 HUD: 計器バー
  * ========================================================================= */
-.jt-header {
+.gp-hud {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-3);
-}
-.jt-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-3);
+  padding-block: var(--sp-1);
   min-width: 0;
 }
+.gp-hud-id {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  flex: 1 1 auto;
+}
 /* ピン形のブランドマーク（地図の発見ピン） */
-.jt-mark {
+.gp-mark {
   display: inline-grid;
   place-items: center;
-  width: 2.6rem;
-  height: 2.6rem;
+  width: 2.2rem;
+  height: 2.2rem;
   flex: none;
   border-radius: 50% 50% 50% 4px;
   transform: rotate(-45deg);
@@ -138,36 +152,81 @@
   );
   box-shadow: var(--shadow-accent);
 }
-.jt-mark span {
+.gp-mark span {
   transform: rotate(45deg);
   color: var(--accent-fg);
   font-weight: var(--fw-black);
-  font-size: 1.05rem;
+  font-size: 0.9rem;
   line-height: 1;
 }
-.jt-titles {
+.gp-hud-titles {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0;
   min-width: 0;
 }
-.jt-title {
+.gp-wordmark {
   font-family: var(--font-display);
-  font-size: var(--fs-md);
+  font-size: var(--fs-base);
   font-weight: var(--fw-black);
   letter-spacing: var(--tracking-snug);
   line-height: 1.1;
   margin: 0;
 }
-.jt-subtitle {
+.gp-coord {
   font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
   color: var(--text-dim);
   letter-spacing: var(--tracking-snug);
+  line-height: 1.2;
   margin: 0;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.jt-iconbtn {
+.gp-hud-right {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex: none;
+}
+/* 残量メーター（HUD 計器） */
+.gp-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-xs);
+}
+.gp-meter-pips {
+  display: inline-flex;
+  gap: 4px;
+}
+.gp-meter-pip {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.gp-meter-pip.is-left {
+  background: var(--accent);
+}
+.gp-meter-pip.is-used {
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+}
+.gp-meter-num {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  min-width: 0.8ch;
+  text-align: center;
+}
+.gp-iconbtn {
   display: inline-grid;
   place-items: center;
   flex: none;
@@ -187,7 +246,7 @@
     border-color var(--transition),
     transform var(--transition);
 }
-.jt-iconbtn:hover {
+.gp-iconbtn:hover {
   background: var(--surface-2);
   color: var(--text);
   border-color: var(--border-strong);
@@ -195,68 +254,77 @@
 }
 
 /* =========================================================================
- * hero: 今日のお題ステージ（シルエット盤を主役に据える作り込み）
+ * 中段 STAGE: 盤面が主役。地図プレート＋コンパス十字の没入面。
  * ========================================================================= */
-.jt-stage {
+.gp-stage {
   position: relative;
   isolation: isolate;
+  outline: none;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: var(--sp-4);
-  padding: var(--sp-6) var(--sp-4) var(--sp-5);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-  overflow: hidden;
+  min-height: 0;
+  min-width: 0;
+  padding: var(--sp-2);
 }
-/* ステージ背面のグリッド（緯線経線のような地図感・極薄・装飾） */
-.jt-stage::before {
+/* 盤面背面の緯線経線（地図感・極薄・装飾） */
+.gp-stage::before {
   content: "";
   position: absolute;
-  inset: 0;
+  inset: -4% -2%;
   z-index: -1;
   background-image:
     linear-gradient(var(--border) 1px, transparent 1px),
     linear-gradient(90deg, var(--border) 1px, transparent 1px);
-  background-size: 38px 38px;
-  mask-image: radial-gradient(75% 70% at 50% 36%, #000 0%, transparent 78%);
-  -webkit-mask-image: radial-gradient(75% 70% at 50% 36%, #000 0%, transparent 78%);
-  opacity: 0.55;
+  background-size: 40px 40px;
+  mask-image: radial-gradient(60% 56% at 50% 46%, #000 0%, transparent 80%);
+  -webkit-mask-image: radial-gradient(60% 56% at 50% 46%, #000 0%, transparent 80%);
+  opacity: 0.5;
 }
-.jt-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
+
+/* コンパス十字の枠。プレートを中央に置き、東西南北を四隅外に配する。 */
+.gp-plate-frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(78vw, 60dvh, 340px);
+  aspect-ratio: 1 / 1;
+}
+.gp-compass {
+  position: absolute;
   font-size: var(--fs-xs);
   font-weight: var(--fw-bold);
   letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-  color: var(--accent);
+  color: var(--text-dim);
 }
-.jt-eyebrow::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--spotlight);
-  box-shadow: 0 0 0 4px var(--spotlight-soft);
+.gp-compass-n {
+  top: calc(var(--sp-4) * -1);
+  left: 50%;
+  transform: translateX(-50%);
+}
+.gp-compass-s {
+  bottom: calc(var(--sp-4) * -1);
+  left: 50%;
+  transform: translateX(-50%);
+}
+.gp-compass-w {
+  left: calc(var(--sp-4) * -1);
+  top: 50%;
+  transform: translateY(-50%);
+}
+.gp-compass-e {
+  right: calc(var(--sp-4) * -1);
+  top: 50%;
+  transform: translateY(-50%);
 }
 
-/* シルエット盤 = 紙の地図に押された墨の輪郭 */
-.jt-silhouette-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--sp-4);
-  width: 100%;
-}
-.jt-silhouette {
+/* 地図プレート = 紙の地図に押された墨の輪郭 */
+.gp-plate {
   position: relative;
   width: 100%;
-  max-width: 320px;
-  aspect-ratio: 1 / 1;
+  height: 100%;
   display: grid;
   place-items: center;
   background: var(--sil-paper);
@@ -264,31 +332,61 @@
   border-radius: var(--radius);
   padding: var(--sp-5);
   box-shadow:
-    var(--shadow-sm),
+    var(--shadow),
     inset 0 0 0 1px hsl(var(--neutral-hue) 30% 100% / 0.6);
 }
-.jt-silhouette svg {
+/* プレート四隅の照準マーク（計器らしさ・装飾） */
+.gp-plate::before,
+.gp-plate::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-strong);
+  opacity: 0.7;
+}
+.gp-plate::before {
+  top: 8px;
+  left: 8px;
+  border-right: none;
+  border-bottom: none;
+  border-top-left-radius: 5px;
+}
+.gp-plate::after {
+  bottom: 8px;
+  right: 8px;
+  border-left: none;
+  border-top: none;
+  border-bottom-right-radius: 5px;
+}
+.gp-plate svg {
   width: 100%;
   height: 100%;
   display: block;
   filter: drop-shadow(0 6px 14px hsl(var(--shadow-color) / 0.18));
 }
-.jt-silhouette path {
+.gp-plate path {
   fill: var(--sil-ink);
 }
-.jt-silhouette.is-correct {
+.gp-plate.is-correct {
   border-color: var(--prox-5);
   box-shadow:
     0 0 0 3px var(--prox-5-tint),
     var(--shadow);
   animation: jt-pop 480ms var(--ease);
 }
+.gp-plate.is-revealed {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 3px var(--accent-tint),
+    var(--shadow);
+}
 @keyframes jt-pop {
   0% { transform: scale(1); }
   45% { transform: scale(1.045); }
   100% { transform: scale(1); }
 }
-/* シルエット読み込み中の skeleton（globals の .skeleton 作法に合わせる） */
+/* シルエット読み込み中の skeleton */
 .jt-skeleton {
   width: 86%;
   height: 86%;
@@ -321,8 +419,8 @@
   }
 }
 
-/* シルエット盤内のエラー状態（globals の .empty-state 思想を踏襲） */
-.jt-stage-error {
+/* プレート内のエラー状態 */
+.gp-plate-error {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -330,7 +428,7 @@
   text-align: center;
   color: var(--text-dim);
 }
-.jt-stage-error .jt-stage-error-icon {
+.gp-plate-error-icon {
   display: inline-grid;
   place-items: center;
   width: 3rem;
@@ -340,85 +438,309 @@
   color: var(--err);
   font-size: 1.4rem;
 }
-.jt-stage-error p {
+.gp-plate-error p {
   margin: 0;
   color: var(--text-soft);
 }
 
-/* =========================================================================
- * ヒント: 1 段ずつ開示するチップ
- * ========================================================================= */
-.jt-hints {
+/* コンパス座標ヒント（段階開示の計器列） */
+.gp-hintrail {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-2);
   justify-content: center;
 }
-.jt-hint {
+.gp-coordbtn {
   display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-height: 38px;
-  padding: 0 var(--sp-4);
-  border-radius: var(--radius-pill);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-height: 44px;
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-sm);
   border: 1px dashed var(--border-strong);
   background: var(--surface);
   color: var(--text-soft);
   font: inherit;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
   cursor: pointer;
+  text-align: left;
   transition:
     background var(--transition),
     color var(--transition),
     border-color var(--transition),
     transform var(--transition);
 }
-.jt-hint::before {
-  content: "?";
-  display: inline-grid;
-  place-items: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  border-radius: 50%;
-  background: var(--surface-2);
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-bold);
-}
-.jt-hint:hover:not(:disabled) {
+.gp-coordbtn:hover:not(:disabled) {
   border-color: var(--accent);
   color: var(--text);
   transform: translateY(-1px);
 }
-.jt-hint.is-open {
-  border-style: solid;
-  border-color: transparent;
-  background: var(--accent-tint);
-  color: var(--accent);
-}
-.jt-hint.is-open::before {
-  content: "✓";
-  background: var(--accent);
-  color: var(--accent-fg);
-}
-.jt-hint:disabled {
+.gp-coordbtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+.gp-coord-label {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.gp-coord-val {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+}
+.gp-coordbtn.is-open {
+  border-style: solid;
+  border-color: transparent;
+  background: var(--accent-tint);
+}
+.gp-coordbtn.is-open .gp-coord-label {
+  color: var(--accent);
+}
+.gp-coordbtn.is-open .gp-coord-val {
+  color: var(--accent);
+  letter-spacing: var(--tracking-snug);
+}
+
+/* 結果オーバーレイ（盤面の上に重ねる。ページに section を挿し込まない） */
+.gp-result-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-3);
+  background: radial-gradient(
+    80% 70% at 50% 40%,
+    hsl(var(--neutral-hue) 30% 8% / 0.32),
+    hsl(var(--neutral-hue) 30% 8% / 0.12)
+  );
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: jt-fade 180ms var(--ease);
+}
+.gp-result {
+  width: 100%;
+  max-width: 22rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-6) var(--sp-5);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  animation: jt-modalin 240ms var(--ease);
+}
+.gp-result.is-won {
+  background:
+    radial-gradient(120% 100% at 50% 0%, var(--prox-5-tint), transparent 70%),
+    var(--surface);
+  border-color: transparent;
+  box-shadow:
+    0 0 0 1px var(--prox-5-tint),
+    var(--shadow-lg);
+}
+.gp-result-emoji {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+.gp-result-title {
+  margin: 0;
+  font-size: var(--fs-lg);
+}
+.gp-result-sub {
+  color: var(--text-soft);
+  font-size: var(--fs-sm);
+  margin: 0;
+}
+.gp-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  justify-content: center;
+  margin-top: var(--sp-2);
+}
+.gp-countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+  padding: var(--sp-1) var(--sp-4);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.gp-countdown b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.gp-result-reopen {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  z-index: 25;
+  padding: var(--sp-1) var(--sp-3);
+  min-height: 36px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  box-shadow: var(--shadow-xs);
+}
+.gp-result-reopen:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
 
 /* =========================================================================
- * 推測入力: combobox ＋ 候補リスト
+ * 下段 CONSOLE: 探索トレイル（履歴・横並び）＋ 入力コマンドバー
  * ========================================================================= */
-.jt-guess {
+.gp-console {
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
+  min-width: 0; /* グリッド子の内容（横スクロールトレイル）が器を押し広げないように */
 }
-.jt-inputrow {
+
+/* 探索トレイル: 推測の足跡を横に流す。6 枠ぶん確保し CLS を防ぐ。 */
+.gp-trail {
+  list-style: none;
+  margin: 0;
+  padding: var(--sp-1) var(--sp-1) var(--sp-2);
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 8.5rem;
+  gap: var(--sp-2);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.gp-stamp {
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 84px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-top-width: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+  font-variant-numeric: tabular-nums;
+  animation: jt-rowin 220ms var(--ease);
+}
+@keyframes jt-rowin {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.gp-stamp.empty {
+  background: transparent;
+  border-style: dashed;
+  border-top-color: var(--border);
+  box-shadow: none;
+  animation: none;
+  align-items: center;
+  justify-content: center;
+}
+.gp-stamp-no {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  color: var(--border-strong);
+}
+.gp-stamp-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.gp-stamp-name {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gp-stamp-arrow {
+  font-size: 1.1rem;
+  font-weight: var(--fw-bold);
+  flex: none;
+}
+.gp-stamp-dist {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-soft);
+}
+.gp-stamp-dir {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--text-dim);
+}
+.gp-stamp-ring {
+  display: block;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  overflow: hidden;
+  margin-top: 2px;
+}
+.gp-stamp-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transition: width 360ms var(--ease);
+}
+.gp-stamp-prox {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--text-dim);
+}
+.p1 { border-top-color: var(--prox-1); }
+.p2 { border-top-color: var(--prox-2); }
+.p3 { border-top-color: var(--prox-3); }
+.p4 { border-top-color: var(--prox-4); }
+.p5 { border-top-color: var(--prox-5); }
+.bar1 { background: var(--prox-1); }
+.bar2 { background: var(--prox-2); }
+.bar3 { background: var(--prox-3); }
+.bar4 { background: var(--prox-4); }
+.bar5 { background: var(--prox-5); }
+
+/* 入力コマンドバー（盤面下に常駐） */
+.gp-command {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.gp-cmd-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--sp-2);
+}
+.gp-inputwrap {
   position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
 }
-.jt-input {
+.gp-input {
   width: 100%;
   min-height: 52px;
   font: inherit;
@@ -434,34 +756,35 @@
     box-shadow var(--transition),
     background var(--transition);
 }
-.jt-input:hover:not(:disabled) {
+.gp-input:hover:not(:disabled) {
   border-color: var(--border-strong);
 }
-.jt-input:focus {
+.gp-input:focus {
   outline: none;
   border-color: var(--accent);
   background: var(--bg);
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
-.jt-input.is-error {
+.gp-input.is-error {
   border-color: var(--err);
 }
-.jt-input.is-error:focus {
+.gp-input.is-error:focus {
   box-shadow: 0 0 0 3px hsl(4 78% 50% / 0.25);
 }
-.jt-input:disabled {
+.gp-input:disabled {
   background: var(--surface-2);
   color: var(--text-dim);
   cursor: progress;
 }
-.jt-input::placeholder {
+.gp-input::placeholder {
   color: var(--text-dim);
   font-weight: var(--fw-normal);
 }
 
-.jt-listbox {
+/* 候補リスト: コマンドバーの上方向に開く（下段固定 UI のため up-drop） */
+.gp-listbox {
   list-style: none;
-  margin: var(--sp-2) 0 0;
+  margin: 0;
   padding: var(--sp-1);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -470,10 +793,12 @@
   position: absolute;
   left: 0;
   right: 0;
-  z-index: 20;
-  overflow: hidden;
+  bottom: calc(100% + var(--sp-2));
+  z-index: 40;
+  max-height: 16rem;
+  overflow-y: auto;
 }
-.jt-option {
+.gp-option {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -484,29 +809,46 @@
   cursor: pointer;
   font-weight: var(--fw-medium);
 }
-.jt-option[aria-selected="true"],
-.jt-option:hover {
+.gp-option[aria-selected="true"],
+.gp-option:hover {
   background: var(--accent-tint);
   color: var(--accent);
 }
-.jt-option .pref {
+.gp-option .pref {
   color: var(--text-dim);
   font-size: var(--fs-sm);
   font-weight: var(--fw-normal);
 }
-.jt-option[aria-selected="true"] .pref,
-.jt-option:hover .pref {
+.gp-option[aria-selected="true"] .pref,
+.gp-option:hover .pref {
   color: var(--accent);
 }
 
-.jt-input-foot {
+/* 推測ボタン = コマンドバー右の確定キー（縦に input と揃える） */
+.gp-fire {
+  flex: none;
+  min-height: 52px;
+  min-width: 5rem;
+  border-radius: var(--radius);
+  font-size: var(--fs-base);
+  padding-inline: var(--sp-5);
+}
+.gp-fire-full {
+  width: 100%;
+  min-height: 52px;
+  border-radius: var(--radius);
+  font-size: var(--fs-base);
+}
+.gp-command-done {
+  margin-top: var(--sp-1);
+}
+
+.gp-cmd-foot {
+  min-height: 1.1rem;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-3);
-  min-height: 1.2rem;
 }
-.jt-errmsg {
+.gp-errmsg {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
@@ -515,203 +857,21 @@
   font-weight: var(--fw-semibold);
   margin: 0;
 }
-.jt-meta {
+.gp-hint-text {
   color: var(--text-dim);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
+}
+
+.gp-source {
   margin: 0;
-}
-/* 残り回数を玉で可視化（数字に依らず一目で残量がわかる） */
-.jt-tries {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  color: var(--text-soft);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-}
-.jt-pips {
-  display: inline-flex;
-  gap: 4px;
-}
-.jt-pip {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--surface-2);
-  border: 1px solid var(--border-strong);
-}
-.jt-pip.is-left {
-  background: var(--accent);
-  border-color: transparent;
-}
-
-/* 推測ボタンは globals の .btn .btn-primary .btn-lg を使用（幅だけ全幅に） */
-.jt-submit {
-  width: 100%;
-}
-
-/* =========================================================================
- * 結果カード（勝敗）
- * ========================================================================= */
-.jt-result {
   text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-6) var(--sp-5);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-}
-.jt-result.is-won {
-  background:
-    radial-gradient(120% 100% at 50% 0%, var(--prox-5-tint), transparent 70%),
-    var(--surface);
-  border-color: transparent;
-  box-shadow:
-    0 0 0 1px var(--prox-5-tint),
-    var(--shadow);
-}
-.jt-result-emoji {
-  font-size: 2.2rem;
-  line-height: 1;
-}
-.jt-result h2 {
-  margin: 0;
-  font-size: var(--fs-lg);
-}
-.jt-result-sub {
-  color: var(--text-soft);
-  font-size: var(--fs-sm);
-  margin: 0;
-}
-.jt-countdown {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  margin-top: var(--sp-2);
-  padding: var(--sp-2) var(--sp-4);
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--text-soft);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-  font-variant-numeric: tabular-nums;
-}
-.jt-countdown b {
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
 }
 
 /* =========================================================================
- * 推測履歴（6 行ぶん確保・CLS 防止）
- * ========================================================================= */
-.jt-history {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-}
-.jt-row {
-  border: 1px solid var(--border);
-  border-left-width: 5px;
-  border-radius: var(--radius);
-  background: var(--surface);
-  padding: var(--sp-3) var(--sp-4);
-  min-height: 64px;
-  box-shadow: var(--shadow-xs);
-  font-variant-numeric: tabular-nums;
-  animation: jt-rowin 220ms var(--ease);
-}
-@keyframes jt-rowin {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.jt-row.empty {
-  background: transparent;
-  border-style: dashed;
-  border-left-color: var(--border);
-  box-shadow: none;
-  animation: none;
-}
-.jt-row-top {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-  gap: var(--sp-3);
-}
-.jt-row .name {
-  font-size: var(--fs-base);
-  font-weight: var(--fw-bold);
-}
-.jt-row .dist {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-  color: var(--text-soft);
-}
-.jt-row .dir {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  font-size: 1.15rem;
-  font-weight: var(--fw-bold);
-}
-.jt-row .dir .dirlabel {
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  color: var(--text-dim);
-}
-.jt-bar {
-  height: 9px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  margin-top: var(--sp-3);
-  overflow: hidden;
-}
-.jt-bar > span {
-  display: block;
-  height: 100%;
-  border-radius: var(--radius-pill);
-  transition: width 360ms var(--ease);
-}
-.jt-prox {
-  font-size: var(--fs-xs);
-  color: var(--text-dim);
-  font-weight: var(--fw-semibold);
-  margin-top: var(--sp-1);
-}
-.p1 { border-left-color: var(--prox-1); }
-.p2 { border-left-color: var(--prox-2); }
-.p3 { border-left-color: var(--prox-3); }
-.p4 { border-left-color: var(--prox-4); }
-.p5 { border-left-color: var(--prox-5); }
-.bar1 { background: var(--prox-1); }
-.bar2 { background: var(--prox-2); }
-.bar3 { background: var(--prox-3); }
-.bar4 { background: var(--prox-4); }
-.bar5 { background: var(--prox-5); }
-
-/* =========================================================================
- * フッター（出典表記）
- * ========================================================================= */
-.jt-footer {
-  margin-top: auto;
-  padding-top: var(--sp-5);
-  border-top: 1px solid var(--border);
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
-  text-align: center;
-}
-.jt-footer p {
-  margin: 0;
-}
-
-/* =========================================================================
- * モーダル（遊び方 / オンボーディング）
+ * モーダル（遊び方 / オンボーディング）— 共通の世界観を踏襲
  * ========================================================================= */
 .jt-modal-backdrop {
   position: fixed;
@@ -742,6 +902,7 @@
   padding: var(--sp-6);
   box-shadow: var(--shadow-lg);
   animation: jt-modalin 220ms var(--ease);
+  counter-reset: jt-steps;
 }
 @keyframes jt-modalin {
   from { opacity: 0; transform: translateY(12px) scale(0.98); }
@@ -782,9 +943,6 @@
   color: var(--accent);
   font-size: var(--fs-sm);
   font-weight: var(--fw-bold);
-}
-.jt-modal {
-  counter-reset: jt-steps;
 }
 .jt-modal p {
   color: var(--text-soft);
@@ -856,17 +1014,51 @@
   border: 0;
 }
 
+/* =========================================================================
+ * 横向き / 低い高さ: 盤面を左、コンソールを右の 2 カラム HUD に組み替える。
+ * （骨格そのものが画面比で再構成される＝没入を保つ）
+ * ========================================================================= */
+@media (orientation: landscape) and (max-height: 560px) {
+  .gp-field {
+    max-width: 56rem;
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(15rem, 20rem);
+    grid-template-areas:
+      "hud    hud"
+      "stage  console";
+    column-gap: var(--sp-4);
+  }
+  .gp-hud { grid-area: hud; }
+  .gp-stage { grid-area: stage; }
+  .gp-console {
+    grid-area: console;
+    justify-content: flex-end;
+  }
+  .gp-trail {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: 100%;
+  }
+  .gp-plate-frame {
+    width: min(80vh, 80%);
+  }
+}
+
 /* reduced-motion: globals 側でも抑制済みだが、ゲーム固有の transform 演出も止める */
 @media (prefers-reduced-motion: reduce) {
-  .jt-silhouette.is-correct,
-  .jt-row,
+  .gp-plate.is-correct,
+  .gp-stamp,
+  .gp-result,
+  .gp-result-overlay,
   .jt-modal,
   .jt-modal-backdrop,
   .jt-toast {
     animation: none !important;
   }
-  .jt-iconbtn:hover,
-  .jt-hint:hover:not(:disabled) {
+  .gp-iconbtn:hover,
+  .gp-coordbtn:hover:not(:disabled) {
     transform: none !important;
   }
 }

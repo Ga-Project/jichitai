@@ -137,10 +137,12 @@ export default function Home() {
   const [hintArea, setHintArea] = useState(false);
 
   const [showHelp, setShowHelp] = useState(false);
+  const [resultOpen, setResultOpen] = useState(true);
   const [toast, setToast] = useState("");
   const [countdown, setCountdown] = useState("");
   const liveRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const dateKey = now ? jstDateKey(now) : "";
   const pNumber = now ? puzzleNumber(now) : 0;
@@ -226,6 +228,11 @@ export default function Home() {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [now]);
+
+  // 勝敗が確定したら結果オーバーレイを開く（再訪時も）。
+  useEffect(() => {
+    if (status !== "playing") setResultOpen(true);
+  }, [status]);
 
   // モーダル: Esc で閉じる・初期フォーカス・簡易フォーカストラップ
   useEffect(() => {
@@ -394,182 +401,324 @@ export default function Home() {
   // 自動解決し、解決できなければエラー表示する（ボタンが無反応に見える問題を回避）。
   const submitDisabled = status !== "playing" || !query.trim();
 
+  // ヒントの開示段（コンパス座標として段階表示する）。
+  const hintRows: { key: string; label: string; open: boolean; value: string }[] =
+    answer
+      ? [
+          { key: "r", label: "地方", open: hintRegion, value: answer.r },
+          { key: "p", label: "都道府県", open: hintPref, value: answer.p },
+          {
+            key: "a",
+            label: "面積",
+            open: hintArea,
+            value: AREA_LABEL[answerArea] ?? "ふつう",
+          },
+        ]
+      : [];
+
   return (
-    <div className="jt-app">
-      <a className="skip-link" href="#main">
-        本文へスキップ
+    <div className="gp-field">
+      <a className="skip-link" href="#console">
+        推測の入力へスキップ
       </a>
 
-      <header className="jt-header">
-        <div className="jt-brand">
-          <span className="jt-mark" aria-hidden="true">
+      {/* ===== 上段 HUD: 探索ログのヘッダ計器（日付・お題番号・残量メーター） ===== */}
+      <header className="gp-hud">
+        <div className="gp-hud-id">
+          <span className="gp-mark" aria-hidden="true">
             <span>市</span>
           </span>
-          <div className="jt-titles">
-            <h1 className="jt-title">ジチタイ</h1>
-            <p className="jt-subtitle">
-              {now ? `${jpDateLabel(now)} ・ #${pNumber}` : "　"}
+          <div className="gp-hud-titles">
+            <h1 className="gp-wordmark">ジチタイ</h1>
+            <p className="gp-coord" aria-hidden={now ? undefined : "true"}>
+              {now ? `${jpDateLabel(now)}・第${pNumber}号` : "　"}
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          className="jt-iconbtn"
-          aria-label="遊び方を見る"
-          onClick={() => setShowHelp(true)}
-        >
-          ?
-        </button>
+
+        <div className="gp-hud-right">
+          {/* 残り回数メーター（HUD の計器として常時表示） */}
+          <div
+            className="gp-meter"
+            aria-label={`残り推測 ${left} / ${MAX_GUESSES} 回`}
+          >
+            <span className="gp-meter-pips" aria-hidden="true">
+              {Array.from({ length: MAX_GUESSES }).map((_, i) => (
+                <span
+                  key={i}
+                  className={`gp-meter-pip${i < left ? " is-left" : " is-used"}`}
+                />
+              ))}
+            </span>
+            <span className="gp-meter-num" aria-hidden="true">
+              {left}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="gp-iconbtn"
+            aria-label="遊び方を見る"
+            onClick={() => setShowHelp(true)}
+          >
+            ?
+          </button>
+        </div>
       </header>
 
-      <main
-        id="main"
-        tabIndex={-1}
-        style={{ outline: "none", display: "contents" }}
-      >
-        {/* シルエット（今日のお題ステージ） */}
-        <section
-          className="jt-stage"
-          aria-labelledby="sil-h"
-        >
-          <h2 id="sil-h" className="jt-visually-hidden">
-            今日のシルエット
-          </h2>
-          <span className="jt-eyebrow">今日のお題</span>
-          <div className="jt-silhouette-wrap">
-            <div
-              className={`jt-silhouette${status === "won" ? " is-correct" : ""}`}
-            >
-              {loadError ? (
-                <div className="jt-stage-error" role="alert">
-                  <span className="jt-stage-error-icon" aria-hidden="true">
-                    !
-                  </span>
-                  <p>お題を読み込めませんでした。</p>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => {
-                      if (typeof location !== "undefined") location.reload();
-                    }}
-                  >
-                    再読み込み
-                  </button>
-                </div>
-              ) : sil ? (
-                <svg
-                  viewBox={`0 0 ${sil.vb} ${sil.vb}`}
-                  role="img"
-                  aria-label="今日の市区町村のシルエット"
+      {/* ===== 中段 STAGE: 盤面が主役。地図プレート＋コンパス座標枠 ===== */}
+      <main id="board" className="gp-stage" tabIndex={-1}>
+        <h2 className="jt-visually-hidden">今日のシルエット</h2>
+
+        {/* 地図プレート（コンパス十字の中心に据える） */}
+        <div className="gp-plate-frame">
+          <span className="gp-compass gp-compass-n" aria-hidden="true">
+            北
+          </span>
+          <span className="gp-compass gp-compass-s" aria-hidden="true">
+            南
+          </span>
+          <span className="gp-compass gp-compass-w" aria-hidden="true">
+            西
+          </span>
+          <span className="gp-compass gp-compass-e" aria-hidden="true">
+            東
+          </span>
+
+          <div
+            className={`gp-plate${status === "won" ? " is-correct" : ""}${status === "lost" ? " is-revealed" : ""}`}
+          >
+            {loadError ? (
+              <div className="gp-plate-error" role="alert">
+                <span className="gp-plate-error-icon" aria-hidden="true">
+                  !
+                </span>
+                <p>お題を読み込めませんでした。</p>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    if (typeof location !== "undefined") location.reload();
+                  }}
                 >
-                  <path d={sil.d} />
-                </svg>
-              ) : (
-                <div className="jt-skeleton" aria-label="本日のお題を準備中" />
-              )}
+                  再読み込み
+                </button>
+              </div>
+            ) : sil ? (
+              <svg
+                viewBox={`0 0 ${sil.vb} ${sil.vb}`}
+                role="img"
+                aria-label="今日の市区町村のシルエット"
+              >
+                <path d={sil.d} />
+              </svg>
+            ) : (
+              <div className="jt-skeleton" aria-label="本日のお題を準備中" />
+            )}
+          </div>
+        </div>
+
+        {/* コンパス座標の段階開示（ヒント）。盤面直下の計器列。 */}
+        {answer && status === "playing" && (
+          <div className="gp-hintrail" aria-label="座標ヒント">
+            {hintRows.map((h, i) => {
+              const prevOpen = i === 0 ? true : (hintRows[i - 1]?.open ?? false);
+              const disabled = !prevOpen || h.open;
+              const onOpen = () => {
+                if (h.key === "r") setHintRegion(true);
+                else if (h.key === "p") setHintPref(true);
+                else setHintArea(true);
+              };
+              return (
+                <button
+                  key={h.key}
+                  type="button"
+                  className={`gp-coordbtn${h.open ? " is-open" : ""}`}
+                  onClick={onOpen}
+                  disabled={disabled}
+                >
+                  <span className="gp-coord-label">{h.label}</span>
+                  <span className="gp-coord-val">
+                    {h.open ? h.value : "▦ ▦ ▦"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* aria-live: 推測結果の読み上げ（専用 live region に一本化） */}
+        <div ref={liveRef} aria-live="polite" className="jt-visually-hidden" />
+
+        {/* 結果オーバーレイ（盤面の上に重ねる。ページに section を挿し込まない） */}
+        {status !== "playing" && answer && resultOpen && (
+          <div className="gp-result-overlay" role="status">
+            <div
+              className={`gp-result${status === "won" ? " is-won" : ""}`}
+            >
+              <span className="gp-result-emoji" aria-hidden="true">
+                {status === "won" ? "🎉" : "🗺️"}
+              </span>
+              <h2 className="gp-result-title">
+                {status === "won" ? `正解！ ${answer.n}` : `正解は ${answer.n}`}
+              </h2>
+              <p className="gp-result-sub">
+                {status === "won"
+                  ? `${guesses.length}回で発見 ・ ${answer.p}・${answer.r}`
+                  : `${answer.p}・${answer.r} ・ また明日チャレンジ！`}
+              </p>
+              <div className="gp-result-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary btn-lg"
+                  onClick={onShare}
+                >
+                  <span aria-hidden="true">📤</span>
+                  結果を共有
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setResultOpen(false)}
+                >
+                  盤面を見る
+                </button>
+              </div>
+              <p className="gp-countdown">
+                次のお題まで <b>{countdown}</b>
+              </p>
             </div>
           </div>
+        )}
 
-          {/* ヒント（1段ずつ開示） */}
-          {answer && status === "playing" && (
-            <div className="jt-hints">
-              <button
-                type="button"
-                className={`jt-hint${hintRegion ? " is-open" : ""}`}
-                onClick={() => setHintRegion(true)}
-                disabled={hintRegion}
-              >
-                {hintRegion ? `地方: ${answer.r}` : "地方を見る"}
-              </button>
-              <button
-                type="button"
-                className={`jt-hint${hintPref ? " is-open" : ""}`}
-                onClick={() => setHintPref(true)}
-                disabled={!hintRegion || hintPref}
-              >
-                {hintPref ? `都道府県: ${answer.p}` : "都道府県を見る"}
-              </button>
-              <button
-                type="button"
-                className={`jt-hint${hintArea ? " is-open" : ""}`}
-                onClick={() => setHintArea(true)}
-                disabled={!hintPref || hintArea}
-              >
-                {hintArea ? `面積: ${AREA_LABEL[answerArea]}` : "面積を見る"}
-              </button>
-            </div>
-          )}
-        </section>
+        {/* 結果を閉じている時、再表示する小タブ */}
+        {status !== "playing" && answer && !resultOpen && (
+          <button
+            type="button"
+            className="gp-result-reopen"
+            onClick={() => setResultOpen(true)}
+          >
+            結果を表示
+          </button>
+        )}
+      </main>
 
-        {/* 入力 */}
+      {/* ===== 下段 CONSOLE: 探索トレイル（履歴）＋ 入力コマンドバー ===== */}
+      <section id="console" className="gp-console" aria-label="推測コンソール">
+        {/* 探索トレイル: 推測の足跡を横に並べる。6 枠ぶん確保し CLS を防ぐ。 */}
+        <ol className="gp-trail" aria-label="推測の履歴">
+          {Array.from({ length: MAX_GUESSES }).map((_, i) => {
+            const g = guesses[i];
+            if (!g) {
+              return (
+                <li key={i} className="gp-stamp empty" aria-hidden="true">
+                  <span className="gp-stamp-no">{i + 1}</span>
+                </li>
+              );
+            }
+            return (
+              <li
+                key={i}
+                className={`gp-stamp p${g.band}`}
+                aria-label={`${g.name}、距離${Math.round(g.distKm)}キロ、方角${g.dirLabel}、近さ${g.proximity}パーセント`}
+              >
+                <span className="gp-stamp-head">
+                  <span className="gp-stamp-name">{g.name}</span>
+                  <span className="gp-stamp-arrow" aria-hidden="true">
+                    {g.isCorrect ? "⭐" : g.arrow}
+                  </span>
+                </span>
+                <span className="gp-stamp-dist">
+                  {g.isCorrect ? "0km" : `${Math.round(g.distKm)}km`}
+                  <span className="gp-stamp-dir" aria-hidden="true">
+                    {g.isCorrect ? "正解" : g.dirLabel}
+                  </span>
+                </span>
+                <span className="gp-stamp-ring" aria-hidden="true">
+                  <span
+                    className={`gp-stamp-fill bar${g.band}`}
+                    style={{ width: `${g.proximity}%` }}
+                  />
+                </span>
+                <span className="gp-stamp-prox" aria-hidden="true">
+                  近さ {g.proximity}%
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+
+        {/* 入力コマンドバー（盤面下に常駐） */}
         {status === "playing" && !loadError && (
-          <section className="jt-guess" aria-label="推測の入力">
-            <div className="jt-inputrow">
-              <input
-                className={`jt-input${inputError ? " is-error" : ""}`}
-                type="text"
-                inputMode="text"
-                autoComplete="off"
-                role="combobox"
-                aria-expanded={listOpen && candidates.length > 0}
-                aria-controls="jt-listbox"
-                aria-autocomplete="list"
-                aria-activedescendant={
-                  activeIndex >= 0 ? `jt-opt-${activeIndex}` : undefined
-                }
-                placeholder={munis ? "市区町村名を入力" : "読み込み中…"}
-                value={query}
-                disabled={!munis}
-                aria-busy={!munis}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setSelected(null);
-                  setListOpen(true);
-                  setActiveIndex(-1);
-                  setInputError("");
-                }}
-                onKeyDown={onInputKeyDown}
-                onBlur={() => setListOpen(false)}
-              />
-              {listOpen && candidates.length > 0 && (
-                <ul className="jt-listbox" id="jt-listbox" role="listbox">
-                  {candidates.map((m, i) => (
-                    <li
-                      key={m.c}
-                      id={`jt-opt-${i}`}
-                      role="option"
-                      aria-selected={i === activeIndex}
-                      className="jt-option"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        chooseCandidate(m);
-                      }}
-                    >
-                      <span>{m.n}</span>
-                      <span className="pref">{m.p}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+          <div className="gp-command">
+            <div className="gp-cmd-row">
+              <div className="gp-inputwrap">
+                <input
+                  ref={inputRef}
+                  className={`gp-input${inputError ? " is-error" : ""}`}
+                  type="text"
+                  inputMode="text"
+                  autoComplete="off"
+                  role="combobox"
+                  aria-expanded={listOpen && candidates.length > 0}
+                  aria-controls="gp-listbox"
+                  aria-autocomplete="list"
+                  aria-activedescendant={
+                    activeIndex >= 0 ? `gp-opt-${activeIndex}` : undefined
+                  }
+                  aria-label="市区町村名を入力して推測"
+                  placeholder={munis ? "市区町村名で探索…" : "読み込み中…"}
+                  value={query}
+                  disabled={!munis}
+                  aria-busy={!munis}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setSelected(null);
+                    setListOpen(true);
+                    setActiveIndex(-1);
+                    setInputError("");
+                  }}
+                  onKeyDown={onInputKeyDown}
+                  onBlur={() => setListOpen(false)}
+                />
+                {listOpen && candidates.length > 0 && (
+                  <ul className="gp-listbox" id="gp-listbox" role="listbox">
+                    {candidates.map((m, i) => (
+                      <li
+                        key={m.c}
+                        id={`gp-opt-${i}`}
+                        role="option"
+                        aria-selected={i === activeIndex}
+                        className="gp-option"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          chooseCandidate(m);
+                        }}
+                      >
+                        <span>{m.n}</span>
+                        <span className="pref">{m.p}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary gp-fire"
+                onClick={commitGuess}
+                disabled={submitDisabled}
+              >
+                推測
+              </button>
             </div>
-            <div className="jt-input-foot">
+            <div className="gp-cmd-foot">
               {inputError ? (
-                <p className="jt-errmsg" role="alert">
+                <p className="gp-errmsg" role="alert">
                   <span aria-hidden="true">⚠</span>
                   {inputError}
                 </p>
               ) : (
-                <span className="jt-tries">
-                  残り
-                  <span className="jt-pips" aria-hidden="true">
-                    {Array.from({ length: MAX_GUESSES }).map((_, i) => (
-                      <span
-                        key={i}
-                        className={`jt-pip${i < left ? " is-left" : ""}`}
-                      />
-                    ))}
-                  </span>
-                  {left}回
+                <span className="gp-hint-text">
+                  残り{left}回・距離と方角を頼りに当てよう
                 </span>
               )}
             </div>
@@ -580,108 +729,29 @@ export default function Home() {
                   : "候補なし"
                 : ""}
             </div>
-            <button
-              type="button"
-              className="btn btn-primary btn-lg jt-submit"
-              onClick={commitGuess}
-              disabled={submitDisabled}
-            >
-              推測する
-            </button>
-          </section>
+          </div>
         )}
 
-        {/* aria-live: 推測結果の読み上げ */}
-        <div ref={liveRef} aria-live="polite" className="jt-visually-hidden" />
-
-        {/* 結果（読み上げは専用 live region に一本化。countdown の毎秒読み上げを避けるため
-            この section には aria-live を付けない） */}
-        {status !== "playing" && answer && (
-          <section
-            className={`jt-result${status === "won" ? " is-won" : ""}`}
-          >
-            <span className="jt-result-emoji" aria-hidden="true">
-              {status === "won" ? "🎉" : "🗺️"}
-            </span>
-            <h2>
-              {status === "won"
-                ? `正解！ ${answer.n}`
-                : `正解は ${answer.n}`}
-            </h2>
-            <p className="jt-result-sub">
-              {status === "won"
-                ? `${guesses.length}回で当たりました ・ ${answer.p}・${answer.r}`
-                : `${answer.p}・${answer.r} ・ また明日チャレンジ！`}
-            </p>
-            <p className="jt-countdown">
-              次のお題まで <b>{countdown}</b>
-            </p>
-          </section>
-        )}
-
-        {/* 推測履歴（6行ぶん確保・CLS防止） */}
-        <section aria-label="推測の履歴">
-          <ol className="jt-history">
-            {Array.from({ length: MAX_GUESSES }).map((_, i) => {
-              const g = guesses[i];
-              if (!g) {
-                return (
-                  <li key={i} className="jt-row empty" aria-hidden="true" />
-                );
-              }
-              return (
-                <li
-                  key={i}
-                  className={`jt-row p${g.band}`}
-                  aria-label={`${g.name}、距離${Math.round(g.distKm)}キロ、方角${g.dirLabel}、近さ${g.proximity}パーセント`}
-                >
-                  <div className="jt-row-top">
-                    <span className="name">{g.name}</span>
-                    <span className="dist">
-                      {g.isCorrect ? "0km" : `${Math.round(g.distKm)}km`}
-                    </span>
-                    <span className="dir" aria-hidden="true">
-                      {g.isCorrect ? "⭐" : g.arrow}
-                      <span className="dirlabel">
-                        {g.isCorrect ? "正解" : g.dirLabel}
-                      </span>
-                    </span>
-                  </div>
-                  <div className="jt-bar">
-                    <span
-                      className={`bar${g.band}`}
-                      style={{ width: `${g.proximity}%` }}
-                    />
-                  </div>
-                  <div className="jt-prox">近さ {g.proximity}%</div>
-                </li>
-              );
-            })}
-          </ol>
-        </section>
-
-        {/* 共有 */}
+        {/* 終了後の共有導線（コンソール内・盤面下） */}
         {status !== "playing" && (
-          <section>
+          <div className="gp-command gp-command-done">
             <button
               type="button"
-              className="btn btn-primary btn-lg jt-submit"
+              className="btn btn-primary gp-fire-full"
               onClick={onShare}
             >
               <span aria-hidden="true">📤</span>
               結果を共有する
             </button>
-          </section>
+          </div>
         )}
-      </main>
 
-      <footer className="jt-footer">
-        <p style={{ margin: 0 }}>
+        <p className="gp-source">
           「国土数値情報（行政区域データ）」（国土交通省）を加工して作成
         </p>
-      </footer>
+      </section>
 
-      {/* オンボーディング / ヘルプ */}
+      {/* ===== オンボーディング / ヘルプ ===== */}
       {showHelp && (
         <div
           className="jt-modal-backdrop"
