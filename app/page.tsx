@@ -105,7 +105,9 @@ function persistDecision(day: number, won: boolean, guessCount: number) {
     isNewRecord: next.maxStreak > before.maxStreak,
     // 「連続が途切れました」は今日切れた時だけ言う。過去に切れたまま時々遊んで
     // いる人に、負けるたび毎回言うのは事実として正しくない。
-    brokeStreak: before.streak > 0 && next.streak === 0,
+    // 判定には保存値の streak ではなく currentStreak を使う。保存値は最後に
+    // 記録した日のもので、何日空いていても 0 にならないため。
+    brokeStreak: currentStreak(before, day) > 0 && next.streak === 0,
   };
 }
 
@@ -308,7 +310,7 @@ export default function Home() {
   // 確認のまま放置されたら自動で解除する。取り返しのつかない操作を待ち構えさせない。
   useEffect(() => {
     if (!resetArmed) return;
-    armedTimer.current = setTimeout(() => setResetArmed(false), 6000);
+    armedTimer.current = setTimeout(() => setResetArmed(false), 15000);
     return () => {
       if (armedTimer.current) clearTimeout(armedTimer.current);
     };
@@ -1003,9 +1005,7 @@ export default function Home() {
                     </dd>
                     <span className="gp-stat-pips" aria-hidden="true" />
                   </div>
-                  <div
-                    className={`gp-stat is-streak${liveStreak > 0 ? " is-lit" : ""}`}
-                  >
+                  <div className={`gp-stat${liveStreak > 0 ? " is-lit" : ""}`}>
                     <dt>連続発見</dt>
                     <dd>
                       {liveStreak}

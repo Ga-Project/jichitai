@@ -289,3 +289,51 @@ test("記録の消去: 未記録の日に消したら完全な初期状態にな
     1,
   );
 });
+
+test("連鎖が切れた判定には保存値の streak を使わない", () => {
+  // 画面側の「連続が途切れました」は currentStreak(before, day) > 0 かつ
+  // next.streak === 0 で判定する。保存値の streak は最後に記録した日のもので、
+  // 何日空いていても 0 にならないため、そのまま使うと今日何も途切れていない
+  // 人にまで「途切れました」と言ってしまう。
+  const stale = {
+    ...emptyStats(),
+    played: 9,
+    wins: 8,
+    streak: 5,
+    maxStreak: 5,
+    lastDay: 100,
+  };
+  assert.equal(stale.streak, 5, "保存値は 5 のまま");
+  assert.equal(
+    currentStreak(stale, 200),
+    0,
+    "99日空いていれば連鎖は生きていない",
+  );
+  const afterLoss = recordResult(stale, {
+    day: 200,
+    won: false,
+    guessCount: 6,
+  });
+  assert.equal(afterLoss.streak, 0);
+  assert.equal(
+    currentStreak(stale, 200) > 0 && afterLoss.streak === 0,
+    false,
+    "今日は何も途切れていない",
+  );
+
+  // 昨日勝って今日負けた場合は、今日切れている
+  const alive = {
+    ...emptyStats(),
+    played: 9,
+    wins: 8,
+    streak: 5,
+    maxStreak: 5,
+    lastDay: 199,
+  };
+  const brokeToday = recordResult(alive, {
+    day: 200,
+    won: false,
+    guessCount: 6,
+  });
+  assert.equal(currentStreak(alive, 200) > 0 && brokeToday.streak === 0, true);
+});
