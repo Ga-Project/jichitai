@@ -1251,7 +1251,10 @@ body {
 }
 .gp-dist-row {
   display: grid;
-  grid-template-columns: 1.25rem 1fr minmax(2.5ch, auto) auto;
+  /* 4列目（「今日」バッジ）は全行で幅を予約する。auto にすると今日の行だけ
+     トラックが狭くなり、同じ件数のバーが行ごとに違う長さで描かれる
+     ＝バー長による符号化が壊れる。 */
+  grid-template-columns: 1.25rem 1fr minmax(2.5ch, auto) 2.75rem;
   align-items: center;
   gap: var(--sp-3);
   font-size: var(--fs-sm);
@@ -1336,6 +1339,13 @@ body {
 }
 .gp-stats-reset:hover {
   color: var(--prox-1);
+}
+/* 消去の確認。ボタンの文字が変わるだけだと支援技術に伝わらないので、
+   独立した status 行としても出す。 */
+.gp-stats-armed {
+  flex-basis: 100%;
+  color: var(--prox-1);
+  font-weight: var(--fw-bold);
 }
 /* 保存できない環境の告知（果たせない約束をしない） */
 .gp-stats-warn {

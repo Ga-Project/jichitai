@@ -67,6 +67,8 @@ const HELP_KEY = "jichitai:helpSeen";
 // 旧キーが読まれなくなり、連続記録が全部消える）。
 const STATS_KEY = "jichitai:stats";
 type ModalKind = "help" | "stats";
+const FOCUSABLE_SEL =
+  'a[href], button, [tabindex]:not([tabindex="-1"]), input, select, textarea';
 
 // localStorage はプライベートモードやストレージ制限で例外を投げうるため安全に包む。
 function lsGet(key: string): string | null {
@@ -191,7 +193,11 @@ export default function Home() {
     const n = new Date();
     setNow(n);
     setModal(lsGet(HELP_KEY) ? null : "help");
-    setStats(parseStats(lsGet(STATS_KEY)));
+    // 読み込んだ値をそのまま書き戻す（正規化済みの冪等な書き込み）ことで、
+    // 最初の決着を待たずに保存できる環境かどうかを判定する。
+    const loaded = parseStats(lsGet(STATS_KEY));
+    setStats(loaded);
+    setStatsSaved(lsSet(STATS_KEY, serializeStats(loaded)));
     let cancelled = false;
     (async () => {
       try {
@@ -303,16 +309,6 @@ export default function Home() {
         ? (document.activeElement as HTMLElement | null)
         : null;
     const node = modalRef.current;
-    const focusables = node
-      ? node.querySelectorAll<HTMLElement>(
-          'a[href], button, [tabindex]:not([tabindex="-1"]), input, select, textarea',
-        )
-      : null;
-    const first = focusables && focusables.length ? focusables[0] : null;
-    const last =
-      focusables && focusables.length
-        ? focusables[focusables.length - 1]
-        : null;
     // 最初のフォーカス可能要素（＝最下部の CTA）ではなく、モーダル本体に当てる。
     // CTA に当てると開いた瞬間に見出しの外までスクロールし、読み上げも末尾から始まる。
     node?.focus();
@@ -320,7 +316,14 @@ export default function Home() {
       if (e.key === "Escape") {
         if (modal === "help") lsSet(HELP_KEY, "1");
         setModal(null);
-      } else if (e.key === "Tab" && first && last) {
+      } else if (e.key === "Tab" && node) {
+        // 中身は入れ替わる（記録の有無・保存不可の警告・消去の確認）ので、
+        // 開いた時に控えた要素を使わず毎回取り直す。控えると切り離された
+        // ノードを指したまま折り返しが効かなくなる。
+        const f = node.querySelectorAll<HTMLElement>(FOCUSABLE_SEL);
+        const first = f[0];
+        const last = f[f.length - 1];
+        if (!first || !last) return;
         if (e.shiftKey && document.activeElement === first) {
           e.preventDefault();
           last.focus();
@@ -333,7 +336,9 @@ export default function Home() {
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
-      if (opener && opener.isConnected) opener.focus();
+      // 初回訪問で自動的に開くヘルプでは opener が body になるので戻さない。
+      if (opener && opener !== document.body && opener.isConnected)
+        opener.focus();
     };
   }, [modal]);
 
@@ -490,12 +495,16 @@ export default function Home() {
       setResetArmed(true);
       return;
     }
-    const cleared = emptyStats();
+    // 当日を記録済みなら lastDay だけ残す。消さないと、リロード時に当日の決着が
+    // 復元経路から記録し直され、消したはずの探検日数が 1 に戻る。
+    // 翌日の勝利は d === lastDay + 1 になるので連鎖の開始も壊れない。
+    const cleared = { ...emptyStats(), lastDay: recordedDay.current };
     setStatsSaved(lsSet(STATS_KEY, serializeStats(cleared)));
     setStats(cleared);
     setNewRecord(false);
-    recordedDay.current = null;
     setResetArmed(false);
+    // 押したボタン自身が空状態への切り替えで消えるため、フォーカスを本体へ戻す。
+    modalRef.current?.focus();
     setToast("記録を消しました");
     setTimeout(() => setToast(""), 2000);
   }
@@ -1030,10 +1039,20 @@ export default function Home() {
                   <button
                     type="button"
                     className="gp-stats-reset"
+                    aria-describedby={resetArmed ? "reset-armed" : undefined}
                     onClick={resetStats}
                   >
                     {resetArmed ? "本当に消す" : "記録を消す"}
                   </button>
+                  {resetArmed && (
+                    <span
+                      id="reset-armed"
+                      role="status"
+                      className="gp-stats-armed"
+                    >
+                      もう一度押すと記録が消えます
+                    </span>
+                  )}
                 </p>
               </>
             )}

@@ -40,6 +40,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # ゲームの純ロジック（距離・方角・出題日付・絵文字グリッド・戦績）を検証する。
+  # 型と lint も build より前に見て、落ちる時は早く落とす。
   # build はこの job も needs にするため、赤ければ公開に進まない。
   # ---------------------------------------------------------------------------
   test:
@@ -54,6 +55,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+      - run: pnpm typecheck
+      - run: pnpm lint
 
   build:
     name: Build (static export)

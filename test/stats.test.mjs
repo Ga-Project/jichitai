@@ -258,3 +258,34 @@ test("currentStreak: 敗北で 0 に落ちた連鎖は 0 のまま", () => {
   );
   assert.equal(currentStreak(s, 2), 0);
 });
+
+test("記録の消去: 当日を記録済みなら lastDay を残して同じ日の再記録を防ぐ", () => {
+  // 画面側の「記録を消す」は { ...emptyStats(), lastDay: 記録済みの日 } を書く。
+  // lastDay を捨てると、リロード時に当日の決着が復元経路から記録し直され、
+  // 消したはずの探検日数が 1 に戻る。
+  const cleared = { ...emptyStats(), lastDay: 203 };
+  const reloaded = recordResult(cleared, {
+    day: 203,
+    won: true,
+    guessCount: 3,
+  });
+  assert.equal(reloaded.played, 0, "同じ日は記録し直されない");
+  assert.deepEqual(parseStats(reloaded), parseStats(cleared));
+});
+
+test("記録の消去: 翌日の正解で連鎖が 1 から再開する", () => {
+  const cleared = { ...emptyStats(), lastDay: 203 };
+  const next = recordResult(cleared, { day: 204, won: true, guessCount: 2 });
+  assert.equal(next.played, 1);
+  assert.equal(next.streak, 1);
+  assert.equal(next.maxStreak, 1);
+});
+
+test("記録の消去: 未記録の日に消したら完全な初期状態になる", () => {
+  const cleared = { ...emptyStats(), lastDay: null };
+  assert.deepEqual(parseStats(cleared), emptyStats());
+  assert.equal(
+    recordResult(cleared, { day: 9, won: true, guessCount: 1 }).played,
+    1,
+  );
+});
