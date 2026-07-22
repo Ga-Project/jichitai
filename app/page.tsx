@@ -24,6 +24,8 @@ import {
   emptyStats,
   parseStats,
   recordResult,
+  serializeStats,
+  currentStreak,
   winRatePct,
   distMax,
 } from "@/lib/stats.mjs";
@@ -61,7 +63,9 @@ const AREA_LABEL = [
 ];
 const STORE_PREFIX = "jichitai:v1:";
 const HELP_KEY = "jichitai:helpSeen";
-const STATS_KEY = "jichitai:stats:v1";
+// 版番号はキーではなく保存値の中に持つ（キーに載せると版を上げた瞬間に
+// 旧キーが読まれなくなり、連続記録が全部消える）。
+const STATS_KEY = "jichitai:stats";
 type ModalKind = "help" | "stats";
 
 // localStorage はプライベートモードやストレージ制限で例外を投げうるため安全に包む。
@@ -74,12 +78,30 @@ function lsGet(key: string): string | null {
     return null;
   }
 }
-function lsSet(key: string, value: string): void {
+/** 保存できたら true。保存できない環境ではその旨を画面に出すため成否を返す。 */
+function lsSet(key: string, value: string): boolean {
   try {
-    if (typeof localStorage !== "undefined") localStorage.setItem(key, value);
+    if (typeof localStorage === "undefined") return false;
+    localStorage.setItem(key, value);
+    return true;
   } catch {
-    /* プライベートモード等の例外は無視 */
+    return false; // プライベートモード・容量超過など
   }
+}
+
+/**
+ * 決着を戦績に書き込む。記録の正は保存値なので、画面の状態ではなく保存値を
+ * 読み直してから記録する（別タブが先に記録していても古い値を書き戻さない）。
+ * 決着が確定した箇所から結果を直接渡す形にして、複数の state を突き合わせない。
+ */
+function persistDecision(day: number, won: boolean, guessCount: number) {
+  const before = parseStats(lsGet(STATS_KEY));
+  const next = recordResult(before, { day, won, guessCount });
+  return {
+    next,
+    saved: lsSet(STATS_KEY, serializeStats(next)),
+    isNewRecord: next.maxStreak > before.maxStreak,
+  };
 }
 
 function dataUrl(path: string): string {
@@ -104,7 +126,9 @@ function jpDateLabel(date: Date): string {
   const d = Number(parts[2]);
   const wd = ["日", "月", "火", "水", "木", "金", "土"];
   const wdIdx = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-  return `${y}年${m}月${d}日(${wd[wdIdx]})`;
+  // 年は毎日同じで情報量が無く、狭い画面では「第N号」を押し出してしまうので出さない
+  // （第N号は共有テキストの #N と対になる識別子なので、こちらを必ず残す）。
+  return `${m}/${d}(${wd[wdIdx]})`;
 }
 
 function makeGuess(g: Muni, ans: Muni): Guess {
@@ -148,6 +172,9 @@ export default function Home() {
 
   const [modal, setModal] = useState<ModalKind | null>(null);
   const [stats, setStats] = useState(emptyStats);
+  const [statsSaved, setStatsSaved] = useState(true);
+  const [newRecord, setNewRecord] = useState(false);
+  const [resetArmed, setResetArmed] = useState(false);
   const recordedDay = useRef<number | null>(null);
   const [resultOpen, setResultOpen] = useState(true);
   const [toast, setToast] = useState("");
@@ -210,6 +237,20 @@ export default function Home() {
             setGuesses(restored);
             if (parsed.status === "won" || parsed.status === "lost") {
               setStatus(parsed.status);
+              // 同じ日の決着は二重に数えない（recordResult 側でも弾かれる）。
+              const day = dayNumber(n);
+              if (recordedDay.current !== day) {
+                recordedDay.current = day;
+                const r = persistDecision(
+                  day,
+                  parsed.status === "won",
+                  restored.length,
+                );
+                setStats(r.next);
+                setStatsSaved(r.saved);
+                // 復元は「今更新した」わけではないので自己最高の演出はしない。
+                setNewRecord(false);
+              }
             }
           } catch {
             /* 壊れた保存は無視 */
@@ -247,27 +288,20 @@ export default function Home() {
     if (status !== "playing") setResultOpen(true);
   }, [status]);
 
-  // 決着した日を戦績に記録する。記録の単位は「お題の通し日数」なので、
-  // その場で決着した場合も、翌日以降に完了済みの進捗を復元した場合も同じ結果になる。
+  // 消去の確認状態はモーダルを開閉するたびに戻す（次に開いた時に確認済みで待たない）。
   useEffect(() => {
-    if (status === "playing" || !now) return;
-    const day = dayNumber(now);
-    if (recordedDay.current === day) return;
-    recordedDay.current = day;
-    setStats((prev) => {
-      const next = recordResult(prev, {
-        day,
-        won: status === "won",
-        guessCount: guesses.length,
-      });
-      lsSet(STATS_KEY, JSON.stringify(next));
-      return next;
-    });
-  }, [status, now, guesses.length]);
+    setResetArmed(false);
+  }, [modal]);
 
-  // モーダル: Esc で閉じる・初期フォーカス・簡易フォーカストラップ
+  // モーダル: Esc で閉じる・初期フォーカス・簡易フォーカストラップ・閉じたら発火元へ復帰
   useEffect(() => {
     if (!modal) return;
+    // 開く前のフォーカス位置を控え、閉じたときに戻す（毎日開く導線なので、
+    // キーボード・スクリーンリーダーで HUD の位置を見失わせない）。
+    const opener =
+      typeof document !== "undefined"
+        ? (document.activeElement as HTMLElement | null)
+        : null;
     const node = modalRef.current;
     const focusables = node
       ? node.querySelectorAll<HTMLElement>(
@@ -279,7 +313,9 @@ export default function Home() {
       focusables && focusables.length
         ? focusables[focusables.length - 1]
         : null;
-    (first ?? node)?.focus();
+    // 最初のフォーカス可能要素（＝最下部の CTA）ではなく、モーダル本体に当てる。
+    // CTA に当てると開いた瞬間に見出しの外までスクロールし、読み上げも末尾から始まる。
+    node?.focus();
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         if (modal === "help") lsSet(HELP_KEY, "1");
@@ -295,7 +331,10 @@ export default function Home() {
       }
     }
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      if (opener && opener.isConnected) opener.focus();
+    };
   }, [modal]);
 
   const candidates = useMemo(() => {
@@ -358,6 +397,17 @@ export default function Home() {
     else if (next.length >= MAX_GUESSES) st = "lost";
     setStatus(st);
     persist(next, st);
+    // 決着したら、この場で確定した結果をそのまま戦績へ渡す。
+    if (st !== "playing" && now) {
+      const day = dayNumber(now);
+      if (recordedDay.current !== day) {
+        recordedDay.current = day;
+        const r = persistDecision(day, st === "won", next.length);
+        setStats(r.next);
+        setStatsSaved(r.saved);
+        setNewRecord(r.isNewRecord);
+      }
+    }
     if (liveRef.current) {
       liveRef.current.textContent = g.isCorrect
         ? `正解！${g.name}`
@@ -406,7 +456,7 @@ export default function Home() {
         puzzleNumber: pNumber,
         won: status === "won",
         url: SHARE_URL,
-        streak: stats.streak,
+        streak: liveStreak,
       },
     );
     try {
@@ -432,7 +482,27 @@ export default function Home() {
     lsSet(HELP_KEY, "1");
   }
 
+  // 記録の消去。1回目の押下で確認に変わり、2回目で実行する（誤爆防止）。
+  // 端末の時計が先に進んだ状態で記録されると以後その日数に追いつくまで記録が
+  // 止まるため、ユーザー自身が復旧できる唯一の手段でもある。
+  function resetStats() {
+    if (!resetArmed) {
+      setResetArmed(true);
+      return;
+    }
+    const cleared = emptyStats();
+    setStatsSaved(lsSet(STATS_KEY, serializeStats(cleared)));
+    setStats(cleared);
+    setNewRecord(false);
+    recordedDay.current = null;
+    setResetArmed(false);
+    setToast("記録を消しました");
+    setTimeout(() => setToast(""), 2000);
+  }
+
   const left = guessesLeft(guesses.length);
+  // 連続日数は保存値をそのまま出さず、今つながっているかを毎回判定して出す。
+  const liveStreak = now ? currentStreak(stats, dayNumber(now)) : 0;
   const rate = winRatePct(stats);
   const barBase = distMax(stats);
   // 今回の結果を分布のどの行にハイライトするか（勝った時だけ）。
@@ -442,19 +512,23 @@ export default function Home() {
   const submitDisabled = status !== "playing" || !query.trim();
 
   // ヒントの開示段（コンパス座標として段階表示する）。
-  const hintRows: { key: string; label: string; open: boolean; value: string }[] =
-    answer
-      ? [
-          { key: "r", label: "地方", open: hintRegion, value: answer.r },
-          { key: "p", label: "都道府県", open: hintPref, value: answer.p },
-          {
-            key: "a",
-            label: "面積",
-            open: hintArea,
-            value: AREA_LABEL[answerArea] ?? "ふつう",
-          },
-        ]
-      : [];
+  const hintRows: {
+    key: string;
+    label: string;
+    open: boolean;
+    value: string;
+  }[] = answer
+    ? [
+        { key: "r", label: "地方", open: hintRegion, value: answer.r },
+        { key: "p", label: "都道府県", open: hintPref, value: answer.p },
+        {
+          key: "a",
+          label: "面積",
+          open: hintArea,
+          value: AREA_LABEL[answerArea] ?? "ふつう",
+        },
+      ]
+    : [];
 
   return (
     <div className="gp-field">
@@ -471,7 +545,14 @@ export default function Home() {
           <div className="gp-hud-titles">
             <h1 className="gp-wordmark">ジチタイ</h1>
             <p className="gp-coord" aria-hidden={now ? undefined : "true"}>
-              {now ? `${jpDateLabel(now)}・第${pNumber}号` : "　"}
+              {now ? (
+                <>
+                  <span className="gp-coord-part">{jpDateLabel(now)}・</span>
+                  <span className="gp-coord-part">第{pNumber}号</span>
+                </>
+              ) : (
+                "　"
+              )}
             </p>
           </div>
         </div>
@@ -496,11 +577,20 @@ export default function Home() {
           </div>
           <button
             type="button"
-            className={`gp-iconbtn${stats.streak >= 2 ? " has-streak" : ""}`}
-            aria-label={`戦績を見る（${stats.played}日プレイ・連続正解${stats.streak}日）`}
+            className={`gp-iconbtn gp-logbtn${liveStreak > 0 ? " has-streak" : ""}`}
+            aria-label={
+              liveStreak > 0
+                ? `探検記録を見る（連続発見${liveStreak}日）`
+                : "探検記録を見る"
+            }
             onClick={() => setModal("stats")}
           >
-            <span aria-hidden="true">{stats.streak >= 2 ? "🔥" : "📊"}</span>
+            <span aria-hidden="true">📊</span>
+            {liveStreak > 0 && (
+              <span className="gp-logbtn-streak" aria-hidden="true">
+                {liveStreak}
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -569,7 +659,8 @@ export default function Home() {
         {answer && status === "playing" && (
           <div className="gp-hintrail" aria-label="座標ヒント">
             {hintRows.map((h, i) => {
-              const prevOpen = i === 0 ? true : (hintRows[i - 1]?.open ?? false);
+              const prevOpen =
+                i === 0 ? true : (hintRows[i - 1]?.open ?? false);
               const disabled = !prevOpen || h.open;
               const onOpen = () => {
                 if (h.key === "r") setHintRegion(true);
@@ -600,9 +691,7 @@ export default function Home() {
         {/* 結果オーバーレイ（盤面の上に重ねる。ページに section を挿し込まない） */}
         {status !== "playing" && answer && resultOpen && (
           <div className="gp-result-overlay" role="status">
-            <div
-              className={`gp-result${status === "won" ? " is-won" : ""}`}
-            >
+            <div className={`gp-result${status === "won" ? " is-won" : ""}`}>
               <span className="gp-result-emoji" aria-hidden="true">
                 {status === "won" ? "🎉" : "🗺️"}
               </span>
@@ -614,13 +703,20 @@ export default function Home() {
                   ? `${guesses.length}回で発見 ・ ${answer.p}・${answer.r}`
                   : `${answer.p}・${answer.r} ・ また明日チャレンジ！`}
               </p>
-              {stats.streak >= 2 && (
-                <p className="gp-streak">
-                  <span aria-hidden="true">🔥</span>
-                  {stats.streak}日連続正解
-                  {stats.streak >= stats.maxStreak ? "・自己最高記録" : ""}
-                </p>
-              )}
+              <button
+                type="button"
+                className={`gp-streak${liveStreak >= 2 ? " is-lit" : ""}`}
+                onClick={() => setModal("stats")}
+              >
+                <span aria-hidden="true">{liveStreak >= 1 ? "🔥" : "🧭"}</span>
+                {liveStreak >= 2
+                  ? `${liveStreak}日連続発見${newRecord ? "・自己最長記録" : ""}`
+                  : liveStreak === 1
+                    ? "連続1日目 — 明日つづけば2日連続"
+                    : stats.maxStreak > 0
+                      ? `連続が途切れました（最長 ${stats.maxStreak}日）`
+                      : "探検記録をひらく"}
+              </button>
               <div className="gp-result-actions">
                 <button
                   type="button"
@@ -638,7 +734,7 @@ export default function Home() {
                   盤面を見る
                 </button>
               </div>
-              <p className="gp-countdown">
+              <p className="gp-countdown" aria-live="off">
                 次のお題まで <b>{countdown}</b>
               </p>
             </div>
@@ -821,36 +917,70 @@ export default function Home() {
             tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="stats-h">戦績</h2>
+            <h2 id="stats-h">探検記録</h2>
+
+            {!statsSaved && (
+              <p className="gp-stats-warn" role="alert">
+                この環境では記録を保存できません（ブラウザのプライベートモードや
+                保存の制限が原因のことがあります）。表示は今回ぶんだけです。
+              </p>
+            )}
 
             {stats.played === 0 ? (
-              <p className="gp-stats-empty">
-                まだ記録がありません。今日のお題に挑戦すると、ここに連続記録と
-                正解率が貯まっていきます。
-              </p>
+              <div className="gp-stats-empty">
+                {/* 何が貯まるのかを実物の形で先に見せる */}
+                <dl className="gp-stats-grid is-ghost" aria-hidden="true">
+                  {["探検日数", "発見率", "連続発見", "最長連続"].map((l) => (
+                    <div className="gp-stat" key={l}>
+                      <dt>{l}</dt>
+                      <dd>–</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p>
+                  まだ記録がありません。今日のお題に挑戦すると、ここに連続発見と発見率が貯まっていきます。
+                </p>
+                <p className="gp-stats-note">
+                  記録はこの端末にだけ保存されます。ブラウザの閲覧データを消すと記録も消えます。
+                </p>
+              </div>
             ) : (
               <>
                 <dl className="gp-stats-grid">
                   <div className="gp-stat">
-                    <dt>プレイ</dt>
-                    <dd>{stats.played}</dd>
+                    <dt>探検日数</dt>
+                    <dd>
+                      {stats.played}
+                      <small>日</small>
+                    </dd>
                   </div>
                   <div className="gp-stat">
-                    <dt>正解率</dt>
+                    <dt>発見率</dt>
                     <dd>
                       {rate}
                       <small>%</small>
                     </dd>
                   </div>
                   <div className="gp-stat is-streak">
-                    <dt>連続正解</dt>
+                    <dt>連続発見</dt>
                     <dd>
-                      {stats.streak}
+                      {liveStreak}
                       <small>日</small>
                     </dd>
+                    {/* 連鎖の長さを数字だけでなくピップ列でも示す（HUD 残量計器と同じ語彙） */}
+                    <span className="gp-stat-pips" aria-hidden="true">
+                      {Array.from({ length: Math.min(liveStreak, 7) }).map(
+                        (_, i) => (
+                          <span key={i} className="gp-stat-pip" />
+                        ),
+                      )}
+                      {liveStreak > 7 && (
+                        <span className="gp-stat-more">+{liveStreak - 7}</span>
+                      )}
+                    </span>
                   </div>
                   <div className="gp-stat">
-                    <dt>最高連続</dt>
+                    <dt>最長連続</dt>
                     <dd>
                       {stats.maxStreak}
                       <small>日</small>
@@ -858,32 +988,53 @@ export default function Home() {
                   </div>
                 </dl>
 
-                <h3 className="gp-stats-sub">推測回数の分布</h3>
-                <ol className="gp-dist" aria-label="正解までにかかった推測回数の分布">
-                  {stats.dist.map((count, i) => (
-                    <li
-                      key={i}
-                      className={`gp-dist-row${todayRow === i + 1 ? " is-today" : ""}`}
-                    >
-                      <span className="gp-dist-no" aria-hidden="true">
-                        {i + 1}
-                      </span>
-                      <span className="gp-dist-track">
-                        <span
-                          className="gp-dist-bar"
-                          style={{ width: `${(count / barBase) * 100}%` }}
-                        />
-                      </span>
-                      <span className="gp-dist-count">
-                        <span className="jt-visually-hidden">
-                          {i + 1}回で正解
+                <h3 className="gp-stats-sub">何回目で見つけたか</h3>
+                <ol
+                  className="gp-dist"
+                  aria-label="見つけるまでにかかった推測回数の分布"
+                >
+                  {stats.dist.map((count, i) => {
+                    const isToday = todayRow === i + 1;
+                    return (
+                      <li
+                        key={i}
+                        className={`gp-dist-row${count > 0 ? " has-count" : ""}${isToday ? " is-today" : ""}`}
+                        aria-current={isToday ? "true" : undefined}
+                      >
+                        <span className="gp-dist-no" aria-hidden="true">
+                          {i + 1}
                         </span>
-                        {count}
-                      </span>
-                    </li>
-                  ))}
+                        <span className="gp-dist-track">
+                          <span
+                            className="gp-dist-bar"
+                            style={{
+                              width: count ? `${(count / barBase) * 100}%` : 0,
+                            }}
+                          />
+                        </span>
+                        <span className="gp-dist-count">
+                          <span className="jt-visually-hidden">
+                            {i + 1}回で見つけた日:
+                          </span>
+                          {count}
+                          <span className="jt-visually-hidden">日</span>
+                        </span>
+                        {/* 今日の行は色以外でも分かるようにラベルと太い罫で示す */}
+                        {isToday && <span className="gp-dist-today">今日</span>}
+                      </li>
+                    );
+                  })}
                 </ol>
-                <p className="gp-stats-note">記録はこの端末にだけ保存されます。</p>
+                <p className="gp-stats-note">
+                  記録はこの端末にだけ保存されます。ブラウザの閲覧データを消すと記録も消えます。
+                  <button
+                    type="button"
+                    className="gp-stats-reset"
+                    onClick={resetStats}
+                  >
+                    {resetArmed ? "本当に消す" : "記録を消す"}
+                  </button>
+                </p>
               </>
             )}
 

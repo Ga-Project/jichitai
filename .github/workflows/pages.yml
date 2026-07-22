@@ -38,9 +38,26 @@ jobs:
       - name: Scan full history
         run: gitleaks detect --no-banner --redact
 
+  # ---------------------------------------------------------------------------
+  # ゲームの純ロジック（距離・方角・出題日付・絵文字グリッド・戦績）を検証する。
+  # build はこの job も needs にするため、赤ければ公開に進まない。
+  # ---------------------------------------------------------------------------
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+
   build:
     name: Build (static export)
-    needs: secret-scan # スキャン通過が前提。fail 時は skip され公開されない。
+    needs: [secret-scan, test] # 両方の通過が前提。fail 時は skip され公開されない。
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

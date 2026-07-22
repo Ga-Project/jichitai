@@ -44,6 +44,12 @@
   /* ===== 差し色: 今日の発見のきらめき（装飾専用・非テキスト） ===== */
   --spotlight: hsl(40 92% 52%);
   --spotlight-soft: hsl(40 92% 52% / 0.18);
+  /* 罫線に使う濃いめの spotlight。淡い地の上でも 3:1 を満たす（非テキスト 1.4.11）。 */
+  --spotlight-line: hsl(38 92% 32%);
+
+  /* 情報グラフィック（分布バー・残量ピップ）の塗り。accent そのものを明るくすると
+     accent 上の白文字が読めなくなるので、面の上でだけ 3:1 を満たす専用の塗りを持つ。 */
+  --data-ink: hsl(var(--accent-h) var(--accent-s) var(--accent-l));
 
   /* ===== シルエット盤（地図の紙・墨の輪郭） ===== */
   --sil-ink: hsl(28 16% 16%);
@@ -61,8 +67,14 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    /* 暗い地の上では accent(明度40%)そのままだと面との対比が 3:1 に届かないので、
+       情報グラフィックの塗りだけ明るくする（accent 自体は上げない＝accent 上の
+       白文字の対比を壊さない）。 */
+    --data-ink: hsl(var(--accent-h) var(--accent-s) 62%);
+
     --spotlight: hsl(42 94% 60%);
     --spotlight-soft: hsl(42 94% 60% / 0.16);
+    --spotlight-line: hsl(42 94% 60%);
 
     --sil-ink: hsl(34 14% 90%);
     --sil-paper: hsl(28 18% 13%);
@@ -172,6 +184,9 @@ body {
   letter-spacing: var(--tracking-snug);
   line-height: 1.1;
   margin: 0;
+  /* 日本語は文字単位で折り返すため、幅が足りないと HUD が2行に伸びて
+     100dvh グリッドの盤面が縮む。ワードマークは常に1行に保つ。 */
+  white-space: nowrap;
 }
 .gp-coord {
   font-size: var(--fs-xs);
@@ -181,9 +196,13 @@ body {
   line-height: 1.2;
   margin: 0;
   font-variant-numeric: tabular-nums;
+  /* 日付と第N号は共有テキストの #N と対になる識別子なので、狭い画面では
+     省略記号で消さずに2行へ折り返す（HUD が数px伸びる分は盤面が吸収する）。 */
+  overflow-wrap: anywhere;
+}
+/* 折り返しは「日付」と「第N号」の境目だけで起こす（第/204号 で切らない） */
+.gp-coord-part {
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .gp-hud-right {
   display: inline-flex;
@@ -212,7 +231,7 @@ body {
   border-radius: 50%;
 }
 .gp-meter-pip.is-left {
-  background: var(--accent);
+  background: var(--data-ink);
 }
 .gp-meter-pip.is-used {
   background: var(--surface-2);
@@ -253,6 +272,26 @@ body {
   transform: translateY(-1px);
 }
 
+/* 狭い画面では計器を詰めて、日付と第N号に幅を返す。 */
+@media (max-width: 380px) {
+  .gp-hud,
+  .gp-hud-right {
+    gap: var(--sp-2);
+  }
+  .gp-meter {
+    padding-inline: var(--sp-2);
+  }
+  /* 残数はピップ列と数字が同じことを示しているので、狭幅では数字だけ残す
+     （ピップ6個ぶんの幅を日付と第N号に返す）。 */
+  .gp-meter-pips {
+    display: none;
+  }
+  .gp-mark {
+    width: 1.9rem;
+    height: 1.9rem;
+  }
+}
+
 /* =========================================================================
  * 中段 STAGE: 盤面が主役。地図プレート＋コンパス十字の没入面。
  * ========================================================================= */
@@ -280,7 +319,11 @@ body {
     linear-gradient(90deg, var(--border) 1px, transparent 1px);
   background-size: 40px 40px;
   mask-image: radial-gradient(60% 56% at 50% 46%, #000 0%, transparent 80%);
-  -webkit-mask-image: radial-gradient(60% 56% at 50% 46%, #000 0%, transparent 80%);
+  -webkit-mask-image: radial-gradient(
+    60% 56% at 50% 46%,
+    #000 0%,
+    transparent 80%
+  );
   opacity: 0.5;
 }
 
@@ -382,9 +425,15 @@ body {
     var(--shadow);
 }
 @keyframes jt-pop {
-  0% { transform: scale(1); }
-  45% { transform: scale(1.045); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.045);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 /* シルエット読み込み中の skeleton */
 .jt-skeleton {
@@ -458,7 +507,7 @@ body {
   min-height: 44px;
   padding: var(--sp-1) var(--sp-3);
   border-radius: var(--radius-sm);
-  border: 1px dashed var(--border-strong);
+  border: 1px dashed var(--text-dim);
   background: var(--surface);
   color: var(--text-soft);
   font: inherit;
@@ -566,20 +615,36 @@ body {
   justify-content: center;
   margin-top: var(--sp-2);
 }
-/* 連続正解バッジ（結果面）。灯りの色＝spotlight を細い罫で使い、計器の語彙に載せる。 */
+/* 連鎖の状態（結果面）。押すと探検記録が開く。灯りの色＝spotlight を細い罫で
+   使い、計器の語彙に載せる。連鎖が生きている時だけ地を灯す。 */
 .gp-streak {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
   margin: var(--sp-1) 0 0;
+  min-height: 44px;
   padding: var(--sp-1) var(--sp-4);
   border-radius: var(--radius-pill);
-  background: var(--spotlight-soft);
-  border: 1px solid var(--spotlight);
-  color: var(--text);
+  background: none;
+  border: 1px solid var(--border-strong);
+  color: var(--text-soft);
+  font: inherit;
   font-size: var(--fs-sm);
-  font-weight: var(--fw-bold);
+  font-weight: var(--fw-semibold);
   font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    border-color var(--transition);
+}
+.gp-streak.is-lit {
+  background: var(--spotlight-soft);
+  border-color: var(--spotlight-line);
+  color: var(--text);
+  font-weight: var(--fw-bold);
+}
+.gp-streak:hover {
+  border-color: var(--text-dim);
 }
 .gp-countdown {
   display: inline-flex;
@@ -661,8 +726,14 @@ body {
   animation: jt-rowin 220ms var(--ease);
 }
 @keyframes jt-rowin {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .gp-stamp.empty {
   background: transparent;
@@ -728,16 +799,36 @@ body {
   font-weight: var(--fw-semibold);
   color: var(--text-dim);
 }
-.p1 { border-top-color: var(--prox-1); }
-.p2 { border-top-color: var(--prox-2); }
-.p3 { border-top-color: var(--prox-3); }
-.p4 { border-top-color: var(--prox-4); }
-.p5 { border-top-color: var(--prox-5); }
-.bar1 { background: var(--prox-1); }
-.bar2 { background: var(--prox-2); }
-.bar3 { background: var(--prox-3); }
-.bar4 { background: var(--prox-4); }
-.bar5 { background: var(--prox-5); }
+.p1 {
+  border-top-color: var(--prox-1);
+}
+.p2 {
+  border-top-color: var(--prox-2);
+}
+.p3 {
+  border-top-color: var(--prox-3);
+}
+.p4 {
+  border-top-color: var(--prox-4);
+}
+.p5 {
+  border-top-color: var(--prox-5);
+}
+.bar1 {
+  background: var(--prox-1);
+}
+.bar2 {
+  background: var(--prox-2);
+}
+.bar3 {
+  background: var(--prox-3);
+}
+.bar4 {
+  background: var(--prox-4);
+}
+.bar5 {
+  background: var(--prox-5);
+}
 
 /* 入力コマンドバー（盤面下に常駐） */
 .gp-command {
@@ -902,8 +993,12 @@ body {
   animation: jt-fade 160ms var(--ease);
 }
 @keyframes jt-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 .jt-modal {
   max-width: 27rem;
@@ -920,8 +1015,14 @@ body {
   counter-reset: jt-steps;
 }
 @keyframes jt-modalin {
-  from { opacity: 0; transform: translateY(12px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 .jt-modal h2 {
   margin: 0 0 var(--sp-2);
@@ -999,9 +1100,30 @@ body {
  * 数値は tabular-nums で桁を揃え、分布は「バー長＋数値」の二重符号化にする
  * （色だけに頼らない＝盤面の近接フィードバックと同じ方針）。
  * ========================================================================= */
-.gp-iconbtn.has-streak {
-  border-color: var(--spotlight);
+.gp-logbtn {
+  position: relative;
+  overflow: visible;
+}
+.gp-logbtn.has-streak {
+  border-color: var(--spotlight-line);
   background: var(--spotlight-soft);
+}
+/* 連続日数は開かなくても見えるようにバッジで出す（アイコン自体は入れ替えない） */
+.gp-logbtn-streak {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  background: var(--text);
+  color: var(--bg);
+  font-size: 0.68rem;
+  font-weight: var(--fw-black);
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 .gp-stats-empty {
   margin: var(--sp-4) 0 var(--sp-5);
@@ -1013,7 +1135,9 @@ body {
 }
 .gp-stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* 幅ベースの media query を持たないスタイルシートなので、列数は固定で 2 にする。
+     4列は 320px で 4文字ラベルが入らず、3桁の値で単位だけが改行して桁がずれる。 */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-2);
   margin: var(--sp-4) 0 var(--sp-5);
 }
@@ -1027,9 +1151,67 @@ body {
   background: var(--surface-sunken);
   border: 1px solid var(--border);
 }
+.gp-stat {
+  position: relative;
+}
+/* プレート四隅の照準マークと同じ語彙をタイルにも入れて「計器」に寄せる */
+.gp-stat::before,
+.gp-stat::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  /* 照準マークは装飾だが、border-strong では地との差が 1.4:1 で実質見えない。
+     text-dim まで上げて「計器」として読める濃さにする。 */
+  border: 1px solid var(--text-dim);
+  pointer-events: none;
+}
+.gp-stat::before {
+  top: 5px;
+  left: 5px;
+  border-right: 0;
+  border-bottom: 0;
+}
+.gp-stat::after {
+  right: 5px;
+  bottom: 5px;
+  border-left: 0;
+  border-top: 0;
+}
 .gp-stat.is-streak {
   background: var(--spotlight-soft);
-  border-color: var(--spotlight);
+  border-color: var(--spotlight-line);
+}
+.gp-stat.is-streak::before,
+.gp-stat.is-streak::after {
+  border-color: var(--spotlight-line);
+}
+/* 連鎖の長さをピップ列でも示す（HUD の残量メーターと同じ符号化） */
+.gp-stat-pips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+  min-height: 8px;
+  order: -1; /* column-reverse なので数値の下に来る */
+}
+.gp-stat-pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--spotlight-line);
+}
+.gp-stat-more {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  color: var(--text-soft);
+  line-height: 1;
+}
+/* 空状態のゴースト（何が貯まるかの下見） */
+.gp-stats-grid.is-ghost {
+  opacity: 0.45;
+  margin-bottom: var(--sp-4);
 }
 .gp-stat dt {
   font-size: var(--fs-xs);
@@ -1039,6 +1221,7 @@ body {
 }
 .gp-stat dd {
   margin: 0;
+  white-space: nowrap;
   font-size: var(--fs-md);
   font-weight: var(--fw-black);
   color: var(--text);
@@ -1068,7 +1251,7 @@ body {
 }
 .gp-dist-row {
   display: grid;
-  grid-template-columns: 1.25rem 1fr 2ch;
+  grid-template-columns: 1.25rem 1fr minmax(2.5ch, auto) auto;
   align-items: center;
   gap: var(--sp-3);
   font-size: var(--fs-sm);
@@ -1084,33 +1267,85 @@ body {
   border-radius: var(--radius-pill);
   background: var(--surface-2);
   overflow: hidden;
+  /* 目盛りを薄く刻んで、ベタ塗りのバーではなく計器の目盛り帯に見せる */
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0 calc(10% - 1px),
+    var(--border) calc(10% - 1px) 10%
+  );
 }
 .gp-dist-bar {
   display: block;
   height: 100%;
-  min-width: 3px;
   border-radius: var(--radius-pill);
-  background: var(--accent);
+  background: var(--data-ink);
   transition: width var(--transition);
+}
+/* 0 件の行は 0 として描く（空を細い棒で埋めない）。1 件以上は必ず見える太さを持たせる。 */
+.gp-dist-row.has-count .gp-dist-bar {
+  min-width: 3px;
 }
 .gp-dist-count {
   color: var(--text-soft);
   text-align: right;
   font-weight: var(--fw-semibold);
 }
-/* 今日の結果の行だけ、番号・バー・件数を揃って強調する */
+/* 今日の結果の行は、色ではなく「ラベル＋太い左罫＋文字の太さ」で示す
+   （色相だけの差は明度が並ぶと区別できない＝この製品の多重符号化方針）。 */
 .gp-dist-row.is-today .gp-dist-no,
 .gp-dist-row.is-today .gp-dist-count {
   color: var(--text);
   font-weight: var(--fw-bold);
 }
-.gp-dist-row.is-today .gp-dist-bar {
-  background: var(--prox-5);
+.gp-dist-row.is-today .gp-dist-track {
+  box-shadow: inset 3px 0 0 0 var(--text);
+}
+.gp-dist-today {
+  justify-self: end;
+  padding: 2px var(--sp-2);
+  border-radius: var(--radius-pill);
+  background: var(--text);
+  color: var(--bg);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  line-height: 1.5;
+  white-space: nowrap;
 }
 .gp-stats-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
   margin: 0 0 var(--sp-4);
   font-size: var(--fs-xs);
   color: var(--text-dim);
+}
+/* 記録の消去。破壊的な操作なので目立たせないが、下線付きで押せると分かる形にする。 */
+.gp-stats-reset {
+  flex: none;
+  min-height: 44px;
+  padding: 0 var(--sp-2);
+  border: 0;
+  background: none;
+  color: var(--text-soft);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.gp-stats-reset:hover {
+  color: var(--prox-1);
+}
+/* 保存できない環境の告知（果たせない約束をしない） */
+.gp-stats-warn {
+  margin: var(--sp-4) 0 0;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius);
+  border: 1px solid var(--prox-1);
+  background: var(--prox-1-tint);
+  color: var(--text);
+  font-size: var(--fs-sm);
 }
 
 /* =========================================================================
@@ -1132,8 +1367,14 @@ body {
   animation: jt-toastin 200ms var(--ease);
 }
 @keyframes jt-toastin {
-  from { opacity: 0; transform: translate(-50%, 8px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 /* =========================================================================
@@ -1165,8 +1406,12 @@ body {
       "stage  console";
     column-gap: var(--sp-4);
   }
-  .gp-hud { grid-area: hud; }
-  .gp-stage { grid-area: stage; }
+  .gp-hud {
+    grid-area: hud;
+  }
+  .gp-stage {
+    grid-area: stage;
+  }
   .gp-console {
     grid-area: console;
     justify-content: flex-end;
