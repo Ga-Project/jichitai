@@ -38,3 +38,11 @@ test("buildShareText: 各推測行に近さ絵文字3マス", () => {
   assert.ok(row.includes("🟩") || row.includes("🟨") || row.includes("🟧") || row.includes("🟥"));
   assert.ok(row.includes("↗"));
 });
+
+test("buildShareText: 連続2日以上は見出しに🔥、1日以下は付けない", () => {
+  const guesses = [{ band: 5, arrow: "↑", isCorrect: true }];
+  const opts = { puzzleNumber: 9, won: true, url: URL };
+  assert.equal(buildShareText(guesses, { ...opts, streak: 4 }).split("\n")[0], "ジチタイ #9 1/6 🔥4");
+  assert.equal(buildShareText(guesses, { ...opts, streak: 1 }).split("\n")[0], "ジチタイ #9 1/6");
+  assert.equal(buildShareText(guesses, opts).split("\n")[0], "ジチタイ #9 1/6");
+});

@@ -566,6 +566,21 @@ body {
   justify-content: center;
   margin-top: var(--sp-2);
 }
+/* 連続正解バッジ（結果面）。灯りの色＝spotlight を細い罫で使い、計器の語彙に載せる。 */
+.gp-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: var(--sp-1) 0 0;
+  padding: var(--sp-1) var(--sp-4);
+  border-radius: var(--radius-pill);
+  background: var(--spotlight-soft);
+  border: 1px solid var(--spotlight);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+}
 .gp-countdown {
   display: inline-flex;
   align-items: center;
@@ -912,7 +927,8 @@ body {
   margin: 0 0 var(--sp-2);
   font-size: var(--fs-lg);
 }
-.jt-modal ol {
+/* 手順リスト（遊び方）。モーダル内の他のリストに漏れないようクラスに閉じる。 */
+.jt-steps {
   margin: var(--sp-4) 0;
   padding: 0;
   list-style: none;
@@ -920,15 +936,17 @@ body {
   flex-direction: column;
   gap: var(--sp-3);
 }
-.jt-modal ol li {
+.jt-steps li {
   position: relative;
   padding-left: calc(1.75rem + var(--sp-3));
   margin: 0;
   min-height: 1.75rem;
-  display: flex;
-  align-items: center;
+  /* flex にすると <strong> と地の文がそれぞれ flex item になり、
+     狭い画面で列に割れて読めなくなる。1行の文章として折り返させる。 */
+  display: block;
+  line-height: 1.75rem;
 }
-.jt-modal ol li::before {
+.jt-steps li::before {
   counter-increment: jt-steps;
   content: counter(jt-steps);
   position: absolute;
@@ -974,6 +992,125 @@ body {
 .jt-modal-cta {
   width: 100%;
   margin-top: var(--sp-2);
+}
+
+/* =========================================================================
+ * 戦績 — HUD の計器をそのまま日誌に持ち込む。
+ * 数値は tabular-nums で桁を揃え、分布は「バー長＋数値」の二重符号化にする
+ * （色だけに頼らない＝盤面の近接フィードバックと同じ方針）。
+ * ========================================================================= */
+.gp-iconbtn.has-streak {
+  border-color: var(--spotlight);
+  background: var(--spotlight-soft);
+}
+.gp-stats-empty {
+  margin: var(--sp-4) 0 var(--sp-5);
+  padding: var(--sp-5);
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  border: 1px dashed var(--border-strong);
+  font-size: var(--fs-sm);
+}
+.gp-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-2);
+  margin: var(--sp-4) 0 var(--sp-5);
+}
+.gp-stat {
+  display: flex;
+  flex-direction: column-reverse; /* 数値を主・ラベルを従に見せる（DOM は dt→dd のまま） */
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-1);
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+}
+.gp-stat.is-streak {
+  background: var(--spotlight-soft);
+  border-color: var(--spotlight);
+}
+.gp-stat dt {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  letter-spacing: var(--tracking-wide);
+  white-space: nowrap;
+}
+.gp-stat dd {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-black);
+  color: var(--text);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.gp-stat dd small {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--text-dim);
+  margin-left: 1px;
+}
+.gp-stats-sub {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  color: var(--text-soft);
+  letter-spacing: var(--tracking-wide);
+}
+.gp-dist {
+  list-style: none;
+  margin: 0 0 var(--sp-3);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.gp-dist-row {
+  display: grid;
+  grid-template-columns: 1.25rem 1fr 2ch;
+  align-items: center;
+  gap: var(--sp-3);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+.gp-dist-no {
+  color: var(--text-dim);
+  text-align: center;
+  font-weight: var(--fw-semibold);
+}
+.gp-dist-track {
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.gp-dist-bar {
+  display: block;
+  height: 100%;
+  min-width: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  transition: width var(--transition);
+}
+.gp-dist-count {
+  color: var(--text-soft);
+  text-align: right;
+  font-weight: var(--fw-semibold);
+}
+/* 今日の結果の行だけ、番号・バー・件数を揃って強調する */
+.gp-dist-row.is-today .gp-dist-no,
+.gp-dist-row.is-today .gp-dist-count {
+  color: var(--text);
+  font-weight: var(--fw-bold);
+}
+.gp-dist-row.is-today .gp-dist-bar {
+  background: var(--prox-5);
+}
+.gp-stats-note {
+  margin: 0 0 var(--sp-4);
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
 }
 
 /* =========================================================================
@@ -1060,5 +1197,8 @@ body {
   .gp-iconbtn:hover,
   .gp-coordbtn:hover:not(:disabled) {
     transform: none !important;
+  }
+  .gp-dist-bar {
+    transition: none !important;
   }
 }

@@ -12,6 +12,7 @@ import {
 import {
   MAX_GUESSES,
   jstDateKey,
+  dayNumber,
   puzzleNumber,
   answerIndex,
   msUntilNextJstMidnight,
@@ -19,6 +20,13 @@ import {
   guessesLeft,
 } from "@/lib/game.mjs";
 import { buildShareText } from "@/lib/share.mjs";
+import {
+  emptyStats,
+  parseStats,
+  recordResult,
+  winRatePct,
+  distMax,
+} from "@/lib/stats.mjs";
 
 type Muni = {
   c: string;
@@ -53,6 +61,8 @@ const AREA_LABEL = [
 ];
 const STORE_PREFIX = "jichitai:v1:";
 const HELP_KEY = "jichitai:helpSeen";
+const STATS_KEY = "jichitai:stats:v1";
+type ModalKind = "help" | "stats";
 
 // localStorage はプライベートモードやストレージ制限で例外を投げうるため安全に包む。
 function lsGet(key: string): string | null {
@@ -136,7 +146,9 @@ export default function Home() {
   const [hintPref, setHintPref] = useState(false);
   const [hintArea, setHintArea] = useState(false);
 
-  const [showHelp, setShowHelp] = useState(false);
+  const [modal, setModal] = useState<ModalKind | null>(null);
+  const [stats, setStats] = useState(emptyStats);
+  const recordedDay = useRef<number | null>(null);
   const [resultOpen, setResultOpen] = useState(true);
   const [toast, setToast] = useState("");
   const [countdown, setCountdown] = useState("");
@@ -151,7 +163,8 @@ export default function Home() {
   useEffect(() => {
     const n = new Date();
     setNow(n);
-    setShowHelp(!lsGet(HELP_KEY));
+    setModal(lsGet(HELP_KEY) ? null : "help");
+    setStats(parseStats(lsGet(STATS_KEY)));
     let cancelled = false;
     (async () => {
       try {
@@ -234,9 +247,27 @@ export default function Home() {
     if (status !== "playing") setResultOpen(true);
   }, [status]);
 
+  // 決着した日を戦績に記録する。記録の単位は「お題の通し日数」なので、
+  // その場で決着した場合も、翌日以降に完了済みの進捗を復元した場合も同じ結果になる。
+  useEffect(() => {
+    if (status === "playing" || !now) return;
+    const day = dayNumber(now);
+    if (recordedDay.current === day) return;
+    recordedDay.current = day;
+    setStats((prev) => {
+      const next = recordResult(prev, {
+        day,
+        won: status === "won",
+        guessCount: guesses.length,
+      });
+      lsSet(STATS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, [status, now, guesses.length]);
+
   // モーダル: Esc で閉じる・初期フォーカス・簡易フォーカストラップ
   useEffect(() => {
-    if (!showHelp) return;
+    if (!modal) return;
     const node = modalRef.current;
     const focusables = node
       ? node.querySelectorAll<HTMLElement>(
@@ -251,8 +282,8 @@ export default function Home() {
     (first ?? node)?.focus();
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        setShowHelp(false);
-        lsSet(HELP_KEY, "1");
+        if (modal === "help") lsSet(HELP_KEY, "1");
+        setModal(null);
       } else if (e.key === "Tab" && first && last) {
         if (e.shiftKey && document.activeElement === first) {
           e.preventDefault();
@@ -265,7 +296,7 @@ export default function Home() {
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [showHelp]);
+  }, [modal]);
 
   const candidates = useMemo(() => {
     if (!munis) return [] as Muni[];
@@ -371,7 +402,12 @@ export default function Home() {
         arrow: g.arrow,
         isCorrect: g.isCorrect,
       })),
-      { puzzleNumber: pNumber, won: status === "won", url: SHARE_URL },
+      {
+        puzzleNumber: pNumber,
+        won: status === "won",
+        url: SHARE_URL,
+        streak: stats.streak,
+      },
     );
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
@@ -392,11 +428,15 @@ export default function Home() {
   }
 
   function dismissHelp() {
-    setShowHelp(false);
+    setModal(null);
     lsSet(HELP_KEY, "1");
   }
 
   const left = guessesLeft(guesses.length);
+  const rate = winRatePct(stats);
+  const barBase = distMax(stats);
+  // 今回の結果を分布のどの行にハイライトするか（勝った時だけ）。
+  const todayRow = status === "won" ? guesses.length : 0;
   // 入力があれば押せる。未選択でクリックした場合は commitGuess が完全一致/単一候補を
   // 自動解決し、解決できなければエラー表示する（ボタンが無反応に見える問題を回避）。
   const submitDisabled = status !== "playing" || !query.trim();
@@ -456,9 +496,17 @@ export default function Home() {
           </div>
           <button
             type="button"
+            className={`gp-iconbtn${stats.streak >= 2 ? " has-streak" : ""}`}
+            aria-label={`戦績を見る（${stats.played}日プレイ・連続正解${stats.streak}日）`}
+            onClick={() => setModal("stats")}
+          >
+            <span aria-hidden="true">{stats.streak >= 2 ? "🔥" : "📊"}</span>
+          </button>
+          <button
+            type="button"
             className="gp-iconbtn"
             aria-label="遊び方を見る"
-            onClick={() => setShowHelp(true)}
+            onClick={() => setModal("help")}
           >
             ?
           </button>
@@ -566,6 +614,13 @@ export default function Home() {
                   ? `${guesses.length}回で発見 ・ ${answer.p}・${answer.r}`
                   : `${answer.p}・${answer.r} ・ また明日チャレンジ！`}
               </p>
+              {stats.streak >= 2 && (
+                <p className="gp-streak">
+                  <span aria-hidden="true">🔥</span>
+                  {stats.streak}日連続正解
+                  {stats.streak >= stats.maxStreak ? "・自己最高記録" : ""}
+                </p>
+              )}
               <div className="gp-result-actions">
                 <button
                   type="button"
@@ -751,8 +806,100 @@ export default function Home() {
         </p>
       </section>
 
+      {/* ===== 戦績（連続記録・正解率・推測回数の分布） ===== */}
+      {modal === "stats" && (
+        <div
+          className="jt-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="stats-h"
+          onClick={() => setModal(null)}
+        >
+          <div
+            className="jt-modal"
+            ref={modalRef}
+            tabIndex={-1}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="stats-h">戦績</h2>
+
+            {stats.played === 0 ? (
+              <p className="gp-stats-empty">
+                まだ記録がありません。今日のお題に挑戦すると、ここに連続記録と
+                正解率が貯まっていきます。
+              </p>
+            ) : (
+              <>
+                <dl className="gp-stats-grid">
+                  <div className="gp-stat">
+                    <dt>プレイ</dt>
+                    <dd>{stats.played}</dd>
+                  </div>
+                  <div className="gp-stat">
+                    <dt>正解率</dt>
+                    <dd>
+                      {rate}
+                      <small>%</small>
+                    </dd>
+                  </div>
+                  <div className="gp-stat is-streak">
+                    <dt>連続正解</dt>
+                    <dd>
+                      {stats.streak}
+                      <small>日</small>
+                    </dd>
+                  </div>
+                  <div className="gp-stat">
+                    <dt>最高連続</dt>
+                    <dd>
+                      {stats.maxStreak}
+                      <small>日</small>
+                    </dd>
+                  </div>
+                </dl>
+
+                <h3 className="gp-stats-sub">推測回数の分布</h3>
+                <ol className="gp-dist" aria-label="正解までにかかった推測回数の分布">
+                  {stats.dist.map((count, i) => (
+                    <li
+                      key={i}
+                      className={`gp-dist-row${todayRow === i + 1 ? " is-today" : ""}`}
+                    >
+                      <span className="gp-dist-no" aria-hidden="true">
+                        {i + 1}
+                      </span>
+                      <span className="gp-dist-track">
+                        <span
+                          className="gp-dist-bar"
+                          style={{ width: `${(count / barBase) * 100}%` }}
+                        />
+                      </span>
+                      <span className="gp-dist-count">
+                        <span className="jt-visually-hidden">
+                          {i + 1}回で正解
+                        </span>
+                        {count}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                <p className="gp-stats-note">記録はこの端末にだけ保存されます。</p>
+              </>
+            )}
+
+            <button
+              type="button"
+              className="btn btn-primary btn-lg jt-modal-cta"
+              onClick={() => setModal(null)}
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ===== オンボーディング / ヘルプ ===== */}
-      {showHelp && (
+      {modal === "help" && (
         <div
           className="jt-modal-backdrop"
           role="dialog"
@@ -767,7 +914,7 @@ export default function Home() {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="help-h">遊び方</h2>
-            <ol>
+            <ol className="jt-steps">
               <li>
                 今日の市区町村の<strong>シルエット</strong>を見る
               </li>
