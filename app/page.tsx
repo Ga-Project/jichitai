@@ -103,6 +103,9 @@ function persistDecision(day: number, won: boolean, guessCount: number) {
     next,
     saved: lsSet(STATS_KEY, serializeStats(next)),
     isNewRecord: next.maxStreak > before.maxStreak,
+    // 「連続が途切れました」は今日切れた時だけ言う。過去に切れたまま時々遊んで
+    // いる人に、負けるたび毎回言うのは事実として正しくない。
+    brokeStreak: before.streak > 0 && next.streak === 0,
   };
 }
 
@@ -176,7 +179,9 @@ export default function Home() {
   const [stats, setStats] = useState(emptyStats);
   const [statsSaved, setStatsSaved] = useState(true);
   const [newRecord, setNewRecord] = useState(false);
+  const [brokeStreak, setBrokeStreak] = useState(false);
   const [resetArmed, setResetArmed] = useState(false);
+  const armedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recordedDay = useRef<number | null>(null);
   const [resultOpen, setResultOpen] = useState(true);
   const [toast, setToast] = useState("");
@@ -256,6 +261,7 @@ export default function Home() {
                 setStatsSaved(r.saved);
                 // 復元は「今更新した」わけではないので自己最高の演出はしない。
                 setNewRecord(false);
+                setBrokeStreak(r.brokeStreak);
               }
             }
           } catch {
@@ -299,6 +305,15 @@ export default function Home() {
     setResetArmed(false);
   }, [modal]);
 
+  // 確認のまま放置されたら自動で解除する。取り返しのつかない操作を待ち構えさせない。
+  useEffect(() => {
+    if (!resetArmed) return;
+    armedTimer.current = setTimeout(() => setResetArmed(false), 6000);
+    return () => {
+      if (armedTimer.current) clearTimeout(armedTimer.current);
+    };
+  }, [resetArmed]);
+
   // モーダル: Esc で閉じる・初期フォーカス・簡易フォーカストラップ・閉じたら発火元へ復帰
   useEffect(() => {
     if (!modal) return;
@@ -324,7 +339,11 @@ export default function Home() {
         const first = f[0];
         const last = f[f.length - 1];
         if (!first || !last) return;
-        if (e.shiftKey && document.activeElement === first) {
+        // 本体は tabIndex=-1 なので first にも last にもならない。開いた直後や
+        // 消去直後は本体にフォーカスがあるので、「first の1つ手前」として扱う。
+        // そうしないと Shift+Tab が素通りし、オーバーレイの背後へ抜ける。
+        const atRoot = document.activeElement === node;
+        if (e.shiftKey && (atRoot || document.activeElement === first)) {
           e.preventDefault();
           last.focus();
         } else if (!e.shiftKey && document.activeElement === last) {
@@ -411,6 +430,7 @@ export default function Home() {
         setStats(r.next);
         setStatsSaved(r.saved);
         setNewRecord(r.isNewRecord);
+        setBrokeStreak(r.brokeStreak);
       }
     }
     if (liveRef.current) {
@@ -495,6 +515,7 @@ export default function Home() {
       setResetArmed(true);
       return;
     }
+    if (armedTimer.current) clearTimeout(armedTimer.current);
     // 当日を記録済みなら lastDay だけ残す。消さないと、リロード時に当日の決着が
     // 復元経路から記録し直され、消したはずの探検日数が 1 に戻る。
     // 翌日の勝利は d === lastDay + 1 になるので連鎖の開始も壊れない。
@@ -513,6 +534,17 @@ export default function Home() {
   // 連続日数は保存値をそのまま出さず、今つながっているかを毎回判定して出す。
   const liveStreak = now ? currentStreak(stats, dayNumber(now)) : 0;
   const rate = winRatePct(stats);
+  // 連鎖の状態を1つの文言に落とす（結果画面の表示とアクセシブル名で同じものを使う）。
+  const streakLabel =
+    liveStreak >= 2
+      ? `${liveStreak}日連続発見${newRecord ? "・自己最長記録" : ""}`
+      : liveStreak === 1
+        ? "連続1日目 — 明日つづけば2日連続"
+        : brokeStreak
+          ? `連続が途切れました（最長 ${stats.maxStreak}日）`
+          : stats.maxStreak > 0
+            ? `連続は0日（最長 ${stats.maxStreak}日）`
+            : "探検記録をひらく";
   const barBase = distMax(stats);
   // 今回の結果を分布のどの行にハイライトするか（勝った時だけ）。
   const todayRow = status === "won" ? guesses.length : 0;
@@ -715,16 +747,14 @@ export default function Home() {
               <button
                 type="button"
                 className={`gp-streak${liveStreak >= 2 ? " is-lit" : ""}`}
+                aria-label={`探検記録を見る（${streakLabel}）`}
                 onClick={() => setModal("stats")}
               >
                 <span aria-hidden="true">{liveStreak >= 1 ? "🔥" : "🧭"}</span>
-                {liveStreak >= 2
-                  ? `${liveStreak}日連続発見${newRecord ? "・自己最長記録" : ""}`
-                  : liveStreak === 1
-                    ? "連続1日目 — 明日つづけば2日連続"
-                    : stats.maxStreak > 0
-                      ? `連続が途切れました（最長 ${stats.maxStreak}日）`
-                      : "探検記録をひらく"}
+                <span aria-hidden="true">{streakLabel}</span>
+                <span className="gp-streak-more" aria-hidden="true">
+                  ›
+                </span>
               </button>
               <div className="gp-result-actions">
                 <button
@@ -943,6 +973,7 @@ export default function Home() {
                     <div className="gp-stat" key={l}>
                       <dt>{l}</dt>
                       <dd>–</dd>
+                      <span className="gp-stat-pips" />
                     </div>
                   ))}
                 </dl>
@@ -962,6 +993,7 @@ export default function Home() {
                       {stats.played}
                       <small>日</small>
                     </dd>
+                    <span className="gp-stat-pips" aria-hidden="true" />
                   </div>
                   <div className="gp-stat">
                     <dt>発見率</dt>
@@ -969,8 +1001,11 @@ export default function Home() {
                       {rate}
                       <small>%</small>
                     </dd>
+                    <span className="gp-stat-pips" aria-hidden="true" />
                   </div>
-                  <div className="gp-stat is-streak">
+                  <div
+                    className={`gp-stat is-streak${liveStreak > 0 ? " is-lit" : ""}`}
+                  >
                     <dt>連続発見</dt>
                     <dd>
                       {liveStreak}
@@ -994,6 +1029,7 @@ export default function Home() {
                       {stats.maxStreak}
                       <small>日</small>
                     </dd>
+                    <span className="gp-stat-pips" aria-hidden="true" />
                   </div>
                 </dl>
 
@@ -1038,7 +1074,7 @@ export default function Home() {
                   記録はこの端末にだけ保存されます。ブラウザの閲覧データを消すと記録も消えます。
                   <button
                     type="button"
-                    className="gp-stats-reset"
+                    className={`gp-stats-reset${resetArmed ? " is-armed" : ""}`}
                     aria-describedby={resetArmed ? "reset-armed" : undefined}
                     onClick={resetStats}
                   >

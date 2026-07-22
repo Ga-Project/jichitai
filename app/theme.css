@@ -281,14 +281,24 @@ body {
   .gp-meter {
     padding-inline: var(--sp-2);
   }
-  /* 残数はピップ列と数字が同じことを示しているので、狭幅では数字だけ残す
-     （ピップ6個ぶんの幅を日付と第N号に返す）。 */
+  /* 残量ピップはこの製品の signature なので、375px では消さずに詰めて残す。 */
   .gp-meter-pips {
-    display: none;
+    gap: 2px;
+  }
+  .gp-meter-pip {
+    width: 6px;
+    height: 6px;
   }
   .gp-mark {
     width: 1.9rem;
     height: 1.9rem;
+  }
+}
+
+/* これ以上は幅が足りない。ピップと同じことを示している数字だけ残す。 */
+@media (max-width: 345px) {
+  .gp-meter-pips {
+    display: none;
   }
 }
 
@@ -626,7 +636,8 @@ body {
   padding: var(--sp-1) var(--sp-4);
   border-radius: var(--radius-pill);
   background: none;
-  border: 1px solid var(--border-strong);
+  /* border-strong は地と 1.45:1 で境界に見えない。押せることが分かる濃さにする。 */
+  border: 1px solid var(--text-dim);
   color: var(--text-soft);
   font: inherit;
   font-size: var(--fs-sm);
@@ -644,7 +655,12 @@ body {
   font-weight: var(--fw-bold);
 }
 .gp-streak:hover {
-  border-color: var(--text-dim);
+  border-color: var(--text);
+}
+/* 押せることを形でも示す（境界の濃さだけに頼らない） */
+.gp-streak-more {
+  color: var(--text-dim);
+  font-weight: var(--fw-bold);
 }
 .gp-countdown {
   display: inline-flex;
@@ -1113,15 +1129,15 @@ body {
   position: absolute;
   top: -3px;
   right: -3px;
-  min-width: 18px;
-  height: 18px;
+  min-width: 20px;
+  height: 20px;
   padding: 0 4px;
   border-radius: var(--radius-pill);
   background: var(--text);
   color: var(--bg);
-  font-size: 0.68rem;
+  font-size: var(--fs-xs);
   font-weight: var(--fw-black);
-  line-height: 18px;
+  line-height: 20px;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -1130,7 +1146,8 @@ body {
   padding: var(--sp-5);
   border-radius: var(--radius);
   background: var(--surface-sunken);
-  border: 1px dashed var(--border-strong);
+  /* border-strong では地との差が 1.4:1 で枠として見えない */
+  border: 1px dashed var(--text-dim);
   font-size: var(--fs-sm);
 }
 .gp-stats-grid {
@@ -1178,12 +1195,12 @@ body {
   border-left: 0;
   border-top: 0;
 }
-.gp-stat.is-streak {
+.gp-stat.is-lit {
   background: var(--spotlight-soft);
   border-color: var(--spotlight-line);
 }
-.gp-stat.is-streak::before,
-.gp-stat.is-streak::after {
+.gp-stat.is-lit::before,
+.gp-stat.is-lit::after {
   border-color: var(--spotlight-line);
 }
 /* 連鎖の長さをピップ列でも示す（HUD の残量メーターと同じ符号化） */
@@ -1193,7 +1210,11 @@ body {
   justify-content: center;
   align-items: center;
   gap: 3px;
-  min-height: 8px;
+  /* 連鎖タイルだけ行の高さが変わると、同じ段の数値が並ばなくなる。全タイルに
+     同じ高さの枠を置き、中身（ピップ・+N）の有無で高さが動かないようにする。 */
+  height: 0.75rem;
+  flex-wrap: nowrap;
+  overflow: hidden;
   order: -1; /* column-reverse なので数値の下に来る */
 }
 .gp-stat-pip {
@@ -1206,7 +1227,7 @@ body {
   font-size: var(--fs-xs);
   font-weight: var(--fw-bold);
   color: var(--text-soft);
-  line-height: 1;
+  line-height: 0.75rem;
 }
 /* 空状態のゴースト（何が貯まるかの下見） */
 .gp-stats-grid.is-ghost {
@@ -1251,10 +1272,11 @@ body {
 }
 .gp-dist-row {
   display: grid;
-  /* 4列目（「今日」バッジ）は全行で幅を予約する。auto にすると今日の行だけ
-     トラックが狭くなり、同じ件数のバーが行ごとに違う長さで描かれる
-     ＝バー長による符号化が壊れる。 */
-  grid-template-columns: 1.25rem 1fr minmax(2.5ch, auto) 2.75rem;
+  /* .gp-dist は flex なので各行が独立したグリッドになる。列幅が内容で変わると
+     1fr のトラック幅が行ごとに変わり、同じ件数のバーが違う長さで描かれる
+     （実際に 100日 のバーが 99日 より短くなっていた）。バー長は分布図の唯一の
+     符号化なので、可変列を1つも置かず全列を固定幅で予約する。 */
+  grid-template-columns: 1.25rem 1fr 3ch 2.75rem;
   align-items: center;
   gap: var(--sp-3);
   font-size: var(--fs-sm);
@@ -1344,6 +1366,10 @@ body {
    独立した status 行としても出す。 */
 .gp-stats-armed {
   flex-basis: 100%;
+  color: var(--prox-1);
+  font-weight: var(--fw-bold);
+}
+.gp-stats-reset.is-armed {
   color: var(--prox-1);
   font-weight: var(--fw-bold);
 }
