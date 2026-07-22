@@ -590,7 +590,7 @@ export default function Home() {
             <p className="gp-coord" aria-hidden={now ? undefined : "true"}>
               {now ? (
                 <>
-                  <span className="gp-coord-part">{jpDateLabel(now)}・</span>
+                  <span className="gp-coord-part">{jpDateLabel(now)}</span>
                   <span className="gp-coord-part">第{pNumber}号</span>
                 </>
               ) : (

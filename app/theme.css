@@ -197,8 +197,11 @@ body {
   margin: 0;
   font-variant-numeric: tabular-nums;
   /* 日付と第N号は共有テキストの #N と対になる識別子なので、狭い画面では
-     省略記号で消さずに2行へ折り返す（HUD が数px伸びる分は盤面が吸収する）。 */
-  overflow-wrap: anywhere;
+     省略記号で消さずに2行へ折り返す（HUD が数px伸びる分は盤面が吸収する）。
+     区切りは中黒ではなく余白で取る。中黒だと折り返した時に行末へ取り残される。 */
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.5em;
 }
 /* 折り返しは「日付」と「第N号」の境目だけで起こす（第/204号 で切らない） */
 .gp-coord-part {
@@ -1288,6 +1291,7 @@ body {
   font-weight: var(--fw-semibold);
 }
 .gp-dist-track {
+  position: relative;
   height: 12px;
   border-radius: var(--radius-pill);
   background: var(--surface-2);
@@ -1323,7 +1327,18 @@ body {
   font-weight: var(--fw-bold);
 }
 .gp-dist-row.is-today .gp-dist-track {
-  box-shadow: inset 3px 0 0 0 var(--text);
+  /* box-shadow の inset は親の背景層に描かれ、子のバーがその上に来るので、
+     バーの伸びている範囲では必ず隠れてしまう（今日の行は件数1以上＝必ず
+     バーがある）。バーより後に描かれる ::after で枠を重ね、バー長に
+     関係なく見えるようにする。 */
+}
+.gp-dist-row.is-today .gp-dist-track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid var(--text);
+  border-radius: inherit;
+  pointer-events: none;
 }
 .gp-dist-today {
   justify-self: end;
