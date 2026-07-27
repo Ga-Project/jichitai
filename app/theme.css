@@ -964,8 +964,36 @@ body {
   border-radius: var(--radius);
   font-size: var(--fs-base);
 }
+/* 終了後の共有導線を縦積みにし、主導線（ネイティブ共有／コピー）の下に
+   X ポストを同じ幅で添える。 */
 .gp-command-done {
   margin-top: var(--sp-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.gp-x-full {
+  width: 100%;
+  min-height: 52px;
+  border-radius: var(--radius);
+  font-size: var(--fs-base);
+}
+/* X（旧Twitter）ポスト用の記号チップ。ボタン地は btn-secondary をそのまま使い、
+   ブランドの黒フィルは計器調の地に浮くので避ける。X 記号だけを小さなチップに収め、
+   前景/背景を text↔surface で反転させることで記号でブランドを想起させつつ
+   ライト/ダーク双方でコントラストを担保し、地の語彙を崩さない。 */
+.gp-x-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35em;
+  height: 1.35em;
+  border-radius: 5px;
+  background: var(--text);
+  color: var(--surface);
+  font-weight: var(--fw-bold);
+  font-size: 0.82em;
+  line-height: 1;
 }
 
 .gp-cmd-foot {

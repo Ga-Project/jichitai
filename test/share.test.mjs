@@ -46,3 +46,15 @@ test("buildShareText: 連続2日以上は見出しに🔥、1日以下は付け�
   assert.equal(buildShareText(guesses, { ...opts, streak: 1 }).split("\n")[0], "ジチタイ #9 1/6");
   assert.equal(buildShareText(guesses, opts).split("\n")[0], "ジチタイ #9 1/6");
 });
+
+// 「Xでポスト」導線(onShareX)は共有本文を x.com/intent に載せる。X は絵文字・日本語を
+// 1文字=加重2、URLをt.co固定23で数え、280加重を超えると投稿ボタンが無効化される。
+// 最悪ケース(6行敗北・大きな番号と連続日数)でも投稿が壊れないことを固定する。
+test("buildShareText: 最悪ケースでもX加重280以内(全ブラウザ1タップ投稿が壊れない)", () => {
+  const guesses = Array.from({ length: 6 }, () => ({ band: 1, arrow: "↓", isCorrect: false }));
+  const txt = buildShareText(guesses, { puzzleNumber: 9999, won: false, url: URL, streak: 9999 });
+  // 保守的上界: URL 行以外の全コードポイントを加重2、URL を t.co 固定23として合算。
+  const withoutUrl = txt.split(URL).join("");
+  const weight = [...withoutUrl].length * 2 + 23;
+  assert.ok(weight < 280, `X加重の保守上界 ${weight} が280を超過`);
+});

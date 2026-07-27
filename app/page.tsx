@@ -472,8 +472,10 @@ export default function Home() {
     }
   }
 
-  async function onShare() {
-    const text = buildShareText(
+  // 近さ帯の絵文字グリッド＋方角だけの、ネタバレなし共有テキスト。
+  // navigator.share / クリップボード / X ポストの3経路で同じ本文を使う。
+  function composeShareText() {
+    return buildShareText(
       guesses.map((g) => ({
         band: g.band,
         arrow: g.arrow,
@@ -486,6 +488,10 @@ export default function Home() {
         streak: liveStreak,
       },
     );
+  }
+
+  async function onShare() {
+    const text = composeShareText();
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
         await navigator.share({ text });
@@ -494,6 +500,35 @@ export default function Home() {
     } catch {
       /* キャンセル等はコピーにフォールバック */
     }
+    try {
+      await navigator.clipboard.writeText(text);
+      setToast("結果をコピーしました");
+      setTimeout(() => setToast(""), 2000);
+    } catch {
+      setToast("コピーできませんでした");
+      setTimeout(() => setToast(""), 2000);
+    }
+  }
+
+  // X（旧Twitter）へ結果を直接ポストする。navigator.share を持たない環境
+  // （多くのデスクトップブラウザ）では共有がクリップボードコピー止まりになり、
+  // 貼り付けの一手間で拡散が切れる。intent を開けば本文入りの投稿画面へ直行でき、
+  // 毎日ゲームの肝である「絵文字グリッドで結果を見せ合う」導線を全ブラウザで担保する。
+  async function onShareX() {
+    const text = composeShareText();
+    // 正準ホストは x.com（twitter.com は 301 する）。intent は本文一体で渡す。
+    const url = `https://x.com/intent/tweet?text=${encodeURIComponent(text)}`;
+    if (typeof window !== "undefined") {
+      // noopener を features に入れると仕様上 open() が null を返し「ブロック検知」に
+      // 使えなくなるため、開いた後に opener を切って reverse-tabnabbing を防ぐ。
+      const w = window.open(url, "_blank");
+      if (w) {
+        w.opener = null;
+        return;
+      }
+    }
+    // ポップアップがブロックされる環境（LINE/X などアプリ内 webview に多い）では
+    // クリップボードに退避し、拡散導線を切らさない。
     try {
       await navigator.clipboard.writeText(text);
       setToast("結果をコピーしました");
@@ -769,6 +804,17 @@ export default function Home() {
                 </button>
                 <button
                   type="button"
+                  className="btn btn-secondary"
+                  onClick={onShareX}
+                  aria-label="Xでポスト"
+                >
+                  <span className="gp-x-glyph" aria-hidden="true">
+                    X
+                  </span>
+                  でポスト
+                </button>
+                <button
+                  type="button"
                   className="btn btn-ghost"
                   onClick={() => setResultOpen(false)}
                 >
@@ -934,6 +980,17 @@ export default function Home() {
             >
               <span aria-hidden="true">📤</span>
               結果を共有する
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary gp-x-full"
+              onClick={onShareX}
+              aria-label="Xでポスト"
+            >
+              <span className="gp-x-glyph" aria-hidden="true">
+                X
+              </span>
+              でポスト
             </button>
           </div>
         )}
