@@ -10,7 +10,20 @@ import "./theme.css";
 // 値は秘密ではない公開コード。未設定の間はタグを出さない（壊れた src を出さない）。
 const GOATCOUNTER_CODE = process.env.NEXT_PUBLIC_GOATCOUNTER_CODE ?? "";
 
+// OGP 画像は絶対 URL でしか解決されないため、配信先を metadataBase に据える。
+// プロジェクトページ配信では basePath（/jichitai）配下に og.png が出るので、
+// 末尾スラッシュ付きの base に相対パス "og.png" を解決させて basePath 込みの URL を得る。
+const BASE_PATH = process.env.PAGES_BASE_PATH || "";
+const SITE_URL = `https://ga-project.github.io${BASE_PATH}/`;
+const OG_IMAGE = {
+  url: "og.png",
+  width: 1200,
+  height: 630,
+  alt: "ジチタイ — 今日の市区町村シルエットを、距離と方角のヒントで6回以内に当てる毎日更新のゲーム",
+};
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "ジチタイ — 毎日の市区町村シルエット当て",
   description:
     "今日のシルエットは何市？日本の市区町村を、距離と方角のヒントを頼りに6回以内で当てる毎日更新のブラウザゲーム。",
@@ -22,12 +35,15 @@ export const metadata: Metadata = {
     type: "website",
     locale: "ja_JP",
     siteName: "ジチタイ",
+    url: SITE_URL,
+    images: [OG_IMAGE],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "ジチタイ — 毎日の市区町村シルエット当て",
     description:
       "今日のシルエットは何市？距離と方角のヒントを頼りに6回以内で当てよう。",
+    images: [OG_IMAGE],
   },
 };
 

@@ -1,0 +1,97 @@
+<!doctype html>
+<meta charset="utf-8" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .card { position: relative; width: 1200px; height: 630px; overflow: hidden;
+    background:
+      radial-gradient(1100px 700px at 30% 18%, hsl(40 92% 52% / 0.16), transparent 60%),
+      linear-gradient(160deg, #fefaf1 0%, #f6ecd8 100%);
+  }
+  /* 紙の地図の緯線経線 */
+  .grid { position: absolute; inset: 0;
+    background-image:
+      repeating-linear-gradient(0deg,  hsl(28 30% 40% / 0.09) 0 1px, transparent 1px 84px),
+      repeating-linear-gradient(90deg, hsl(28 30% 40% / 0.09) 0 1px, transparent 1px 84px);
+  }
+  .stage { position: absolute; left: 78px; top: 96px; width: 440px; height: 440px; }
+  .plate { position: absolute; inset: 0; border-radius: 30px;
+    background: hsl(36 42% 99%);
+    box-shadow: 0 18px 40px hsl(28 40% 20% / 0.18), inset 0 0 0 2px hsl(38 92% 32% / 0.25);
+  }
+  /* コンパス十字 */
+  .cross-v, .cross-h { position: absolute; background: hsl(18 80% 40% / 0.35); }
+  .cross-v { left: 219px; top: 26px; width: 2px; height: 388px; }
+  .cross-h { top: 219px; left: 26px; height: 2px; width: 388px; }
+  .n { position: absolute; left: 206px; top: 20px; font-weight: 800; font-size: 22px; color: hsl(18 80% 40%); }
+  svg.sil { position: absolute; left: 70px; top: 78px; width: 300px; height: 300px;
+    filter: drop-shadow(0 8px 14px hsl(28 40% 20% / 0.25)); }
+  .pin { position: absolute; left: 188px; top: 150px; width: 46px; height: 46px; }
+
+  .right { position: absolute; left: 556px; top: 74px; width: 612px; }
+  .kicker { display: inline-block; font-size: 23px; font-weight: 700; letter-spacing: .04em;
+    color: hsl(18 80% 40%); background: hsl(18 80% 40% / 0.10);
+    padding: 8px 18px; border-radius: 999px; }
+  .title { margin-top: 18px; font-size: 120px; font-weight: 900; letter-spacing: .02em;
+    color: hsl(18 80% 38%); line-height: .96; }
+  .sub { margin-top: 22px; font-size: 31px; font-weight: 700; color: hsl(28 16% 16%); line-height: 1.4; }
+  .squares { margin-top: 28px; display: flex; gap: 12px; }
+  .sq { width: 52px; height: 52px; border-radius: 12px; box-shadow: inset 0 -4px 0 hsl(28 40% 20% / 0.14); }
+  .chip { margin-top: 26px; display: inline-flex; align-items: center; gap: 10px;
+    font-size: 24px; font-weight: 800; color: hsl(28 16% 16%);
+    background: hsl(40 92% 52% / 0.22); padding: 10px 20px; border-radius: 14px; }
+  .url { position: absolute; left: 78px; bottom: 40px; font-size: 25px; font-weight: 700;
+    color: hsl(28 16% 30%); letter-spacing: .01em; }
+</style>
+<div class="card">
+  <div class="grid"></div>
+
+  <div class="stage">
+    <div class="plate"></div>
+    <div class="cross-v"></div>
+    <div class="cross-h"></div>
+    <div class="n">N</div>
+    <!-- 抽象的な市区町村シルエット（特定の答えではない・墨の輪郭）。
+         雲に見えないよう、非対称の海岸線＋岬2つ＋入り江1つ＋直線区間で「地形」に寄せる。 -->
+    <svg class="sil" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+      <path fill="hsl(28 16% 16%)" d="M96 66
+        C120 50 138 54 150 62 L172 52
+        C190 64 188 82 200 90 L236 104
+        C246 120 236 134 240 150
+        C246 178 224 190 214 206 L222 236
+        C206 250 190 246 180 238
+        C168 256 150 252 140 244 L120 250
+        C98 242 92 226 96 214 L66 206
+        C54 190 62 176 66 166
+        C48 150 52 132 64 124
+        C58 104 74 96 86 98
+        C84 82 88 72 96 66 Z" />
+    </svg>
+    <!-- 発見ピン（鳥居の朱） -->
+    <svg class="pin" viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">
+      <path d="M23 2 C33 2 41 10 41 20 C41 33 23 44 23 44 C23 44 5 33 5 20 C5 10 13 2 23 2 Z"
+        fill="hsl(18 80% 40%)" stroke="#fff" stroke-width="3"/>
+      <circle cx="23" cy="19" r="7" fill="#fff"/>
+    </svg>
+  </div>
+
+  <div class="right">
+    <span class="kicker">毎日更新 · シルエット当て</span>
+    <div class="title">ジチタイ</div>
+    <div class="sub">今日のシルエットは何市？<br/>距離と方角のヒントで6回以内に当てる。</div>
+    <div class="squares">
+      <div class="sq" style="background:#b0473a"></div>
+      <div class="sq" style="background:#cf7a2e"></div>
+      <div class="sq" style="background:#b88a12"></div>
+      <div class="sq" style="background:#5f8f2a"></div>
+      <div class="sq" style="background:#157a3f"></div>
+    </div>
+    <div class="chip">🧭 結果はネタバレなしの絵文字でシェア</div>
+  </div>
+
+  <div class="url">ga-project.github.io/jichitai</div>
+</div>
