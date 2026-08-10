@@ -193,8 +193,24 @@ export default function Home() {
   const [countdown, setCountdown] = useState("");
   const liveRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
-  const dismissHelpRef = useRef<() => void>(() => {});
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // 遊び方を見終わった／案内を閉じた、を1つに集約する。遊び方モーダルの3経路
+  // （CTA・背景・Escape）と一行案内の ✕ が共有する。modal が既に null の場合の
+  // setModal(null) と、coach が既に false の場合の setCoach(false) は no-op。
+  //
+  // フォーカスを盤面へ移すのは、案内から開いた場合は発火元（案内内のリンク）ごと
+  // 消えてモーダル側の復帰先が無くなるため。? ボタンから開いた場合は effect の
+  // cleanup が後から opener へ戻すので、そちらが優先される。
+  //
+  // 参照を固定するのは Escape ハンドラ（deps は modal のみ）から直接呼ぶため。
+  // 状態を読まないので依存はなく、レンダー中に ref へ控える必要もない。
+  const dismissHelp = useCallback(() => {
+    setModal(null);
+    lsSet(HELP_KEY, "1");
+    setCoach(false);
+    document.getElementById("board")?.focus();
+  }, []);
 
   const dateKey = now ? jstDateKey(now) : "";
   const pNumber = now ? puzzleNumber(now) : 0;
@@ -335,9 +351,8 @@ export default function Home() {
     node?.focus();
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        // 遊び方を閉じた扱いは1箇所（dismissHelp）に集約する。この効果は modal でしか
-        // 貼り直さないため、直接呼ぶと coach が古いまま捕まる。常に最新を ref から引く。
-        if (modal === "help") dismissHelpRef.current();
+        // 遊び方を閉じた扱いは1箇所（dismissHelp）に集約する。
+        if (modal === "help") dismissHelp();
         else setModal(null);
       } else if (e.key === "Tab" && node) {
         // 中身は入れ替わる（記録の有無・保存不可の警告・消去の確認）ので、
@@ -363,11 +378,13 @@ export default function Home() {
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
-      // 初回訪問で自動的に開くヘルプでは opener が body になるので戻さない。
+      // 案内内のリンクから開いた場合、発火元は閉じる時に unmount 済みなので戻さない
+      // （その経路は dismissHelp が盤面へ移す）。body への復帰も意味がないので除く。
       if (opener && opener !== document.body && opener.isConnected)
         opener.focus();
     };
-  }, [modal]);
+    // dismissHelp は useCallback で参照が固定されているので、依存に入れても貼り直されない。
+  }, [modal, dismissHelp]);
 
   const candidates = useMemo(() => {
     if (!munis) return [] as Muni[];
@@ -548,28 +565,13 @@ export default function Home() {
     }
   }
 
-  // 全文を読み終えたので一行案内は役目を終える。案内から開いていた場合は
-  // 発火元ごと消えるため、モーダル側の復帰先が無くなる。盤面へ明示的に戻す。
-  function dismissHelp() {
-    setModal(null);
-    if (coach) closeCoach();
-  }
-  // Escape ハンドラは modal でしか貼り直さないので、最新の dismissHelp をここで控える。
-  dismissHelpRef.current = dismissHelp;
 
   // 「もう案内は要らない」を保存するだけで、表示は消さない。
   // STAGE は中央寄せの固定1画面なので、盤面を見ている最中に案内が消えると
   // 盤面自体が上下に跳ぶ。特に初回推測の直後は距離と方角を読む場面なので動かさない。
+  // 初日は推測のたびに通るため、既に保存済みなら書かない。
   function markCoachSeen() {
-    lsSet(HELP_KEY, "1");
-  }
-
-  // 明示的に閉じた時だけ即座に消す。この場合は利用者自身の操作なので跳ねても驚かせない。
-  // 押したボタンごと消えるため、フォーカスは盤面へ戻す（背後へ抜けさせない）。
-  function closeCoach() {
-    markCoachSeen();
-    setCoach(false);
-    document.getElementById("board")?.focus();
+    if (!lsGet(HELP_KEY)) lsSet(HELP_KEY, "1");
   }
 
   // 記録の消去。1回目の押下で確認に変わり、2回目で実行する（誤爆防止）。
@@ -779,7 +781,7 @@ export default function Home() {
               type="button"
               className="gp-coach-close"
               aria-label="案内を閉じる"
-              onClick={closeCoach}
+              onClick={dismissHelp}
             >
               ✕
             </button>
