@@ -505,6 +505,71 @@ body {
   color: var(--text-soft);
 }
 
+/* 初回訪問の案内（盤面を覆わない一行。計器列と同じ素材感で盤面の続きに見せる） */
+.gp-coach {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  max-width: 34rem;
+  margin-inline: auto;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px dashed var(--text-dim);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-soft);
+}
+.gp-coach-text {
+  margin: 0;
+  flex: 1;
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+.gp-coach-text b {
+  color: var(--text);
+  font-weight: var(--fw-bold);
+}
+.gp-coach-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex-shrink: 0;
+}
+.gp-coach-more,
+.gp-coach-close {
+  min-height: 44px;
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    color var(--transition);
+}
+.gp-coach-close {
+  min-width: 44px;
+  color: var(--text-dim);
+}
+.gp-coach-more:hover,
+.gp-coach-close:hover {
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+/* 幅が足りない端末では本文を1行に詰めず、操作列を下へ回す。 */
+@media (max-width: 380px) {
+  .gp-coach {
+    flex-wrap: wrap;
+  }
+  .gp-coach-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
 /* コンパス座標ヒント（段階開示の計器列） */
 .gp-hintrail {
   display: flex;

@@ -178,6 +178,9 @@ export default function Home() {
   const [hintArea, setHintArea] = useState(false);
 
   const [modal, setModal] = useState<ModalKind | null>(null);
+  // 初回訪問の案内。盤面を覆うモーダルではなく、盤面直下の非ブロッキングな一行で出す。
+  // シルエット（この遊びの入口）を最初に見せることを優先する。
+  const [coach, setCoach] = useState(false);
   const [stats, setStats] = useState(emptyStats);
   const [statsSaved, setStatsSaved] = useState(true);
   const [newRecord, setNewRecord] = useState(false);
@@ -199,7 +202,7 @@ export default function Home() {
   useEffect(() => {
     const n = new Date();
     setNow(n);
-    setModal(lsGet(HELP_KEY) ? null : "help");
+    setCoach(!lsGet(HELP_KEY));
     // 読み込んだ値をそのまま書き戻す（正規化済みの冪等な書き込み）ことで、
     // 最初の決着を待たずに保存できる環境かどうかを判定する。
     const loaded = parseStats(lsGet(STATS_KEY));
@@ -331,7 +334,7 @@ export default function Home() {
     node?.focus();
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        if (modal === "help") lsSet(HELP_KEY, "1");
+        if (modal === "help") dismissCoach();
         setModal(null);
       } else if (e.key === "Tab" && node) {
         // 中身は入れ替わる（記録の有無・保存不可の警告・消去の確認）ので、
@@ -414,6 +417,8 @@ export default function Home() {
     const g = makeGuess(target, answer);
     const next = [...guesses, g];
     setGuesses(next);
+    // 1回推測できた時点で遊び方は伝わっている。以後この案内は出さない。
+    if (coach) dismissCoach();
     setQuery("");
     setSelected(null);
     setListOpen(false);
@@ -541,6 +546,13 @@ export default function Home() {
 
   function dismissHelp() {
     setModal(null);
+    dismissCoach();
+  }
+
+  // 案内を閉じる。閉じた事実を保存して次回以降は出さない。
+  // 遊び方を最後まで読んだ時も、自力で1回推測できた時も「もう案内は要らない」と見なす。
+  function dismissCoach() {
+    setCoach(false);
     lsSet(HELP_KEY, "1");
   }
 
@@ -732,6 +744,33 @@ export default function Home() {
             )}
           </div>
         </div>
+
+        {/* 初回訪問の案内。盤面を隠さないよう、覆わずに直下へ添える。 */}
+        {coach && status === "playing" && (
+          <div className="gp-coach">
+            <p className="gp-coach-text">
+              このシルエットがどの市区町村か、
+              <b>距離と方角</b>のヒントを頼りに<b>6回以内</b>で当てるゲームです。
+            </p>
+            <div className="gp-coach-actions">
+              <button
+                type="button"
+                className="gp-coach-more"
+                onClick={() => setModal("help")}
+              >
+                詳しい遊び方
+              </button>
+              <button
+                type="button"
+                className="gp-coach-close"
+                aria-label="案内を閉じる"
+                onClick={dismissCoach}
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* コンパス座標の段階開示（ヒント）。盤面直下の計器列。 */}
         {answer && status === "playing" && (
