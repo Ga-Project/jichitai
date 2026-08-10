@@ -33,6 +33,11 @@
   --accent-tint-2: hsl(var(--accent-h) calc(var(--accent-s) - 14%) 92%);
   --accent-ring: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.4);
   --accent-fg: #ffffff; /* accent 上の文字（既定 accent で対比 4.7:1 AA） */
+  /* 面の上に「文字として」置く accent。塗り（--accent）は accent-fg との対比で
+     明度が決まるので、文字色に流用すると地との対比 4.5:1 を割ることがある。
+     文字用はこのトークンを使い、製品側が dark で別値に差し替えられるようにする。 */
+  --accent-ink: var(--accent);
+  --accent-ink-hover: var(--accent-hover);
 
   /* ===== neutral: 完全な無彩色を避け、わずかに寒色寄りで深みを出す ===== */
   /* --neutral-hue を製品が変えれば、グレースケール全体の温度感が動く。 */
@@ -241,17 +246,17 @@ ol {
   font-weight: var(--fw-bold);
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 a {
-  color: var(--accent);
+  color: var(--accent-ink);
   text-underline-offset: 2px;
   text-decoration-thickness: 1px;
   transition: color var(--transition);
 }
 a:hover {
-  color: var(--accent-hover);
+  color: var(--accent-ink-hover);
 }
 
 /* フォーカスリング（キーボード操作時のみ・全インタラクティブ要素） */
@@ -498,7 +503,7 @@ a.card:hover,
   height: 2.75rem;
   border-radius: var(--radius-sm);
   background: var(--accent-tint);
-  color: var(--accent);
+  color: var(--accent-ink);
   margin-bottom: var(--sp-1);
 }
 .card h3 {
@@ -523,7 +528,7 @@ a.card:hover,
 }
 .badge-accent {
   background: var(--accent-tint);
-  color: var(--accent);
+  color: var(--accent-ink);
   border-color: transparent;
 }
 .badge-ok {

@@ -194,6 +194,14 @@ export default function Home() {
   const liveRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // 押した要素自身がその操作で消える導線がいくつもある（初回案内・結果の開閉）。
+  // その時に何もしないとフォーカスが body へ落ち、キーボード操作は先頭からやり直しに
+  // なる。常に在るものへ渡し直すための受け皿を用意しておく。
+  const boardRef = useRef<HTMLElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+  const resultReopenRef = useRef<HTMLButtonElement>(null);
+  // 結果の開閉が「利用者の操作」で起きた時だけフォーカスを動かす（初期表示では動かさない）。
+  const resultToggled = useRef(false);
 
   const dateKey = now ? jstDateKey(now) : "";
   const pNumber = now ? puzzleNumber(now) : 0;
@@ -329,6 +337,8 @@ export default function Home() {
         ? (document.activeElement as HTMLElement | null)
         : null;
     const node = modalRef.current;
+    // 盤面は常時マウントされているので、開いた時点の参照をそのまま戻り先に使える。
+    const board = boardRef.current;
     // 最初のフォーカス可能要素（＝最下部の CTA）ではなく、モーダル本体に当てる。
     // CTA に当てると開いた瞬間に見出しの外までスクロールし、読み上げも末尾から始まる。
     node?.focus();
@@ -360,11 +370,26 @@ export default function Home() {
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
-      // 初回訪問で自動的に開くヘルプでは opener が body になるので戻さない。
-      if (opener && opener !== document.body && opener.isConnected)
+      // 発火元が無い（body から開いた）場合は戻す先が無いので何もしない。
+      if (!opener || opener === document.body) return;
+      if (opener.isConnected) {
         opener.focus();
+        return;
+      }
+      // 閉じる操作そのもので発火元が消えることがある（初回案内の「遊び方」は
+      // 読み終えた時点で案内ごと畳まれる）。body へ落とすとタブ順が先頭に戻るので、
+      // 常に在る盤面へ渡す。
+      board?.focus();
     };
   }, [modal]);
+
+  // 結果パネルの開閉は押したボタン自身を消すので、対になる要素へフォーカスを渡す。
+  useEffect(() => {
+    if (!resultToggled.current) return;
+    resultToggled.current = false;
+    if (resultOpen) resultRef.current?.focus();
+    else resultReopenRef.current?.focus();
+  }, [resultOpen]);
 
   const candidates = useMemo(() => {
     if (!munis) return [] as Muni[];
@@ -694,7 +719,7 @@ export default function Home() {
       </header>
 
       {/* ===== 中段 STAGE: 盤面が主役。地図プレート＋コンパス座標枠 ===== */}
-      <main id="board" className="gp-stage" tabIndex={-1}>
+      <main id="board" className="gp-stage" tabIndex={-1} ref={boardRef}>
         <h2 className="jt-visually-hidden">今日のシルエット</h2>
 
         {/* 地図プレート（コンパス十字の中心に据える） */}
@@ -748,23 +773,29 @@ export default function Home() {
         {/* 初回訪問の案内。盤面を隠さないよう、覆わずに直下へ添える。 */}
         {coach && status === "playing" && (
           <div className="gp-coach">
+            {/* 中段の高さは盤面と分け合うので、案内は2行に収まる長さに保つ。
+                距離と方角の説明はコンソールの一行と「遊び方」が担う。 */}
             <p className="gp-coach-text">
-              このシルエットがどの市区町村か、
-              <b>距離と方角</b>のヒントを頼りに<b>6回以内</b>で当てるゲームです。
+              このシルエットは<b>どこの市区町村</b>？<b>6回以内</b>で当てよう。
             </p>
             <div className="gp-coach-actions">
               <button
                 type="button"
                 className="gp-coach-more"
+                aria-label="詳しい遊び方を見る"
                 onClick={() => setModal("help")}
               >
-                詳しい遊び方
+                遊び方
               </button>
               <button
                 type="button"
                 className="gp-coach-close"
                 aria-label="案内を閉じる"
-                onClick={dismissCoach}
+                onClick={() => {
+                  // このボタン自身が消えるので、フォーカスを盤面へ渡してから畳む。
+                  dismissCoach();
+                  boardRef.current?.focus();
+                }}
               >
                 ✕
               </button>
@@ -808,7 +839,11 @@ export default function Home() {
         {/* 結果オーバーレイ（盤面の上に重ねる。ページに section を挿し込まない） */}
         {status !== "playing" && answer && resultOpen && (
           <div className="gp-result-overlay" role="status">
-            <div className={`gp-result${status === "won" ? " is-won" : ""}`}>
+            <div
+              className={`gp-result${status === "won" ? " is-won" : ""}`}
+              ref={resultRef}
+              tabIndex={-1}
+            >
               <span className="gp-result-emoji" aria-hidden="true">
                 {status === "won" ? "🎉" : "🗺️"}
               </span>
@@ -855,7 +890,10 @@ export default function Home() {
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  onClick={() => setResultOpen(false)}
+                  onClick={() => {
+                    resultToggled.current = true;
+                    setResultOpen(false);
+                  }}
                 >
                   盤面を見る
                 </button>
@@ -872,7 +910,11 @@ export default function Home() {
           <button
             type="button"
             className="gp-result-reopen"
-            onClick={() => setResultOpen(true)}
+            ref={resultReopenRef}
+            onClick={() => {
+              resultToggled.current = true;
+              setResultOpen(true);
+            }}
           >
             結果を表示
           </button>

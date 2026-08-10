@@ -71,6 +71,11 @@
        情報グラフィックの塗りだけ明るくする（accent 自体は上げない＝accent 上の
        白文字の対比を壊さない）。 */
     --data-ink: hsl(var(--accent-h) var(--accent-s) 62%);
+    /* 文字としての accent も同じ理由で別値を持つ。塗りの --accent(40%) は暗い面に
+       対して 3.2:1 しかなく、本文サイズの文字に必要な 4.5:1 を満たさない。
+       68% なら --surface に 7.3:1、--accent-tint の上でも 5.2:1 で AA を満たす。 */
+    --accent-ink: hsl(var(--accent-h) var(--accent-s) 68%);
+    --accent-ink-hover: hsl(var(--accent-h) var(--accent-s) 78%);
 
     --spotlight: hsl(42 94% 60%);
     --spotlight-soft: hsl(42 94% 60% / 0.16);
@@ -340,13 +345,20 @@ body {
   opacity: 0.5;
 }
 
-/* コンパス十字の枠。プレートを中央に置き、東西南北を四隅外に配する。 */
+/* コンパス十字の枠。プレートを中央に置き、東西南北を四隅外に配する。
+   正方形は「幅」ではなく「高さ」で決め、flex の縮小に委ねる。幅基準にすると
+   盤面が中段の残り高さを無視して伸び、body が overflow:hidden なので逃げ場なく
+   HUD とコンソールへめり込む（中段に案内やヒント列が増えるほど深刻になる）。
+   高さ基準 + flex-shrink なら、中段に何を足しても盤面が先に譲って必ず収まる。 */
 .gp-plate-frame {
   position: relative;
   display: grid;
   place-items: center;
-  width: min(78vw, 60dvh, 340px);
+  height: min(78vw, 60dvh, 340px);
   aspect-ratio: 1 / 1;
+  flex: 0 1 auto;
+  min-height: 0;
+  max-width: 100%;
 }
 .gp-compass {
   position: absolute;
@@ -505,14 +517,17 @@ body {
   color: var(--text-soft);
 }
 
-/* 初回訪問の案内（盤面を覆わない一行。計器列と同じ素材感で盤面の続きに見せる） */
+/* 初回訪問の案内（盤面を覆わない一行。計器列と同じ素材感で盤面の続きに見せる）。
+   中段の高さは 100dvh グリッドの残りしかなく、ここで使った分だけ盤面が縮む。
+   案内は「主役を押しのけない密度」を保つ: 折り返さず、本文と操作は常に横並び。 */
 .gp-coach {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--sp-2);
+  flex: none;
   max-width: 34rem;
   margin-inline: auto;
-  padding: var(--sp-2) var(--sp-3);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
   border: 1px dashed var(--text-dim);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -521,6 +536,7 @@ body {
 .gp-coach-text {
   margin: 0;
   flex: 1;
+  min-width: 0;
   font-size: var(--fs-sm);
   line-height: 1.6;
 }
@@ -541,10 +557,11 @@ body {
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--accent);
+  color: var(--accent-ink);
   font: inherit;
   font-size: var(--fs-xs);
   font-weight: var(--fw-bold);
+  white-space: nowrap;
   cursor: pointer;
   transition:
     background var(--transition),
@@ -557,16 +574,15 @@ body {
 .gp-coach-more:hover,
 .gp-coach-close:hover {
   background: var(--accent-tint);
-  color: var(--accent);
+  color: var(--accent-ink-hover);
 }
-/* 幅が足りない端末では本文を1行に詰めず、操作列を下へ回す。 */
-@media (max-width: 380px) {
-  .gp-coach {
-    flex-wrap: wrap;
-  }
-  .gp-coach-actions {
-    width: 100%;
-    justify-content: flex-end;
+/* 中段の高さが足りない端末では、初回案内が出ている間だけ計器列を伏せる。
+   段階開示ヒントは詰まってから使うもので、まだ1回も推測していない初回訪問では
+   出番がない。案内と計器列を両方並べると盤面が潰れ、シルエットを最初に見せる
+   という初回訪問の狙い自体が失われる。案内は最初の推測で畳まれ、計器列は戻る。 */
+@media (max-height: 700px) {
+  .gp-stage:has(.gp-coach) .gp-hintrail {
+    display: none;
   }
 }
 
@@ -625,10 +641,10 @@ body {
   background: var(--accent-tint);
 }
 .gp-coordbtn.is-open .gp-coord-label {
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .gp-coordbtn.is-open .gp-coord-val {
-  color: var(--accent);
+  color: var(--accent-ink);
   letter-spacing: var(--tracking-snug);
 }
 
@@ -1002,7 +1018,7 @@ body {
 .gp-option[aria-selected="true"],
 .gp-option:hover {
   background: var(--accent-tint);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .gp-option .pref {
   color: var(--text-dim);
@@ -1011,7 +1027,7 @@ body {
 }
 .gp-option[aria-selected="true"] .pref,
 .gp-option:hover .pref {
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 /* 推測ボタン = コマンドバー右の確定キー（縦に input と揃える） */
@@ -1171,7 +1187,7 @@ body {
   height: 1.75rem;
   border-radius: 50%;
   background: var(--accent-tint);
-  color: var(--accent);
+  color: var(--accent-ink);
   font-size: var(--fs-sm);
   font-weight: var(--fw-bold);
 }
@@ -1567,8 +1583,10 @@ body {
     overflow-y: auto;
     max-height: 100%;
   }
+  /* 2 カラムでも正方形は高さ基準のまま（幅基準に戻すと中段からはみ出す）。
+     max-width で列幅を超えないよう抑え、あとは flex の縮小に任せる。 */
   .gp-plate-frame {
-    width: min(80vh, 80%);
+    height: min(80vh, 100%);
   }
 }
 
