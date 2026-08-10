@@ -193,6 +193,7 @@ export default function Home() {
   const [countdown, setCountdown] = useState("");
   const liveRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const dismissHelpRef = useRef<() => void>(() => {});
   const inputRef = useRef<HTMLInputElement>(null);
 
   const dateKey = now ? jstDateKey(now) : "";
@@ -334,8 +335,10 @@ export default function Home() {
     node?.focus();
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        if (modal === "help") dismissCoach();
-        setModal(null);
+        // 遊び方を閉じた扱いは1箇所（dismissHelp）に集約する。この効果は modal でしか
+        // 貼り直さないため、直接呼ぶと coach が古いまま捕まる。常に最新を ref から引く。
+        if (modal === "help") dismissHelpRef.current();
+        else setModal(null);
       } else if (e.key === "Tab" && node) {
         // 中身は入れ替わる（記録の有無・保存不可の警告・消去の確認）ので、
         // 開いた時に控えた要素を使わず毎回取り直す。控えると切り離された
@@ -417,8 +420,9 @@ export default function Home() {
     const g = makeGuess(target, answer);
     const next = [...guesses, g];
     setGuesses(next);
-    // 1回推測できた時点で遊び方は伝わっている。以後この案内は出さない。
-    if (coach) dismissCoach();
+    // 1回推測できた時点で遊び方は伝わっている。次回以降は出さないが、
+    // いま出ている案内はそのまま残す（盤面を跳ねさせない。決着時に status 条件で消える）。
+    if (coach) markCoachSeen();
     setQuery("");
     setSelected(null);
     setListOpen(false);
@@ -544,16 +548,28 @@ export default function Home() {
     }
   }
 
+  // 全文を読み終えたので一行案内は役目を終える。案内から開いていた場合は
+  // 発火元ごと消えるため、モーダル側の復帰先が無くなる。盤面へ明示的に戻す。
   function dismissHelp() {
     setModal(null);
-    dismissCoach();
+    if (coach) closeCoach();
+  }
+  // Escape ハンドラは modal でしか貼り直さないので、最新の dismissHelp をここで控える。
+  dismissHelpRef.current = dismissHelp;
+
+  // 「もう案内は要らない」を保存するだけで、表示は消さない。
+  // STAGE は中央寄せの固定1画面なので、盤面を見ている最中に案内が消えると
+  // 盤面自体が上下に跳ぶ。特に初回推測の直後は距離と方角を読む場面なので動かさない。
+  function markCoachSeen() {
+    lsSet(HELP_KEY, "1");
   }
 
-  // 案内を閉じる。閉じた事実を保存して次回以降は出さない。
-  // 遊び方を最後まで読んだ時も、自力で1回推測できた時も「もう案内は要らない」と見なす。
-  function dismissCoach() {
+  // 明示的に閉じた時だけ即座に消す。この場合は利用者自身の操作なので跳ねても驚かせない。
+  // 押したボタンごと消えるため、フォーカスは盤面へ戻す（背後へ抜けさせない）。
+  function closeCoach() {
+    markCoachSeen();
     setCoach(false);
-    lsSet(HELP_KEY, "1");
+    document.getElementById("board")?.focus();
   }
 
   // 記録の消去。1回目の押下で確認に変わり、2回目で実行する（誤爆防止）。
@@ -746,13 +762,11 @@ export default function Home() {
         </div>
 
         {/* 初回訪問の案内。盤面を隠さないよう、覆わずに直下へ添える。 */}
-        {coach && status === "playing" && (
+        {coach && status === "playing" && !loadError && (
           <div className="gp-coach">
             <p className="gp-coach-text">
-              このシルエットがどの市区町村か、
-              <b>距離と方角</b>のヒントを頼りに<b>6回以内</b>で当てるゲームです。
-            </p>
-            <div className="gp-coach-actions">
+              シルエットから市区町村を当てるゲーム。推測すると
+              <b>距離と方角</b>が出ます。<b>6回以内</b>に。
               <button
                 type="button"
                 className="gp-coach-more"
@@ -760,15 +774,15 @@ export default function Home() {
               >
                 詳しい遊び方
               </button>
-              <button
-                type="button"
-                className="gp-coach-close"
-                aria-label="案内を閉じる"
-                onClick={dismissCoach}
-              >
-                ✕
-              </button>
-            </div>
+            </p>
+            <button
+              type="button"
+              className="gp-coach-close"
+              aria-label="案内を閉じる"
+              onClick={closeCoach}
+            >
+              ✕
+            </button>
           </div>
         )}
 

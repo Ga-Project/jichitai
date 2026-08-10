@@ -505,22 +505,21 @@ body {
   color: var(--text-soft);
 }
 
-/* 初回訪問の案内（盤面を覆わない一行。計器列と同じ素材感で盤面の続きに見せる） */
+/* 初回訪問の案内。
+   盤面と縦バジェットを取り合う位置に入るため、本文2行分の高さに収める
+   （操作列を持たず、リンクは文中・閉じるは右上に重ねる）。
+   破線＋面は計器列(.gp-coordbtn)＝「押せるもの」の語彙なので使わない。
+   注記であることが読み取れるよう、左罫のアクセントだけで示す。 */
 .gp-coach {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--sp-2);
+  position: relative;
   max-width: 34rem;
   margin-inline: auto;
-  padding: var(--sp-2) var(--sp-3);
-  border: 1px dashed var(--text-dim);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  padding: var(--sp-1) calc(44px) var(--sp-1) var(--sp-3);
+  border-left: 2px solid var(--accent);
   color: var(--text-soft);
 }
 .gp-coach-text {
   margin: 0;
-  flex: 1;
   font-size: var(--fs-sm);
   line-height: 1.6;
 }
@@ -528,45 +527,49 @@ body {
   color: var(--text);
   font-weight: var(--fw-bold);
 }
-.gp-coach-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-1);
-  flex-shrink: 0;
+/* 文中リンク。行の流れに乗せ、独立した操作行を作らない。 */
+.gp-coach-more {
+  margin-inline-start: var(--sp-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: var(--fw-bold);
+  text-decoration: underline;
+  cursor: pointer;
 }
-.gp-coach-more,
+/* 閉じるは本文の右上に重ねる。当たり判定は44pxを確保しつつ高さは占有しない。 */
 .gp-coach-close {
-  min-height: 44px;
-  padding: 0 var(--sp-2);
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--accent);
+  color: var(--text-dim);
   font: inherit;
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-bold);
   cursor: pointer;
   transition:
     background var(--transition),
     color var(--transition);
 }
-.gp-coach-close {
-  min-width: 44px;
-  color: var(--text-dim);
-}
-.gp-coach-more:hover,
 .gp-coach-close:hover {
   background: var(--accent-tint);
   color: var(--accent);
 }
-/* 幅が足りない端末では本文を1行に詰めず、操作列を下へ回す。 */
-@media (max-width: 380px) {
+/* 画面が低い端末では案内を出さない。
+   STAGE は縦に伸びない固定1画面なので、案内の分だけ盤面が押し上げられ、
+   「まず盤面を見せる」という案内自体の目的を潰してしまう。
+   実測: 320x568 で盤面上端が 23px 欠ける／375x667 でヘッダーへ 48px 食い込む。
+   780px 超で初めて余白が足りる（390x800 実測で食い込み 0）。
+   遊び方はヘッダーの ? から常に開けるので、情報は失われない。 */
+@media (max-height: 780px) {
   .gp-coach {
-    flex-wrap: wrap;
-  }
-  .gp-coach-actions {
-    width: 100%;
-    justify-content: flex-end;
+    display: none;
   }
 }
 
