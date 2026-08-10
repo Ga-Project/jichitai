@@ -311,6 +311,8 @@ body {
 .gp-stage {
   position: relative;
   isolation: isolate;
+  /* マウス操作で盤面に枠が出ないよう既定は消す。ただしキーボードで明示的に
+     フォーカスを移す先でもあるため、:focus-visible では下でリングを戻す。 */
   outline: none;
   display: flex;
   flex-direction: column;
@@ -561,13 +563,43 @@ body {
   background: var(--accent-tint);
   color: var(--accent);
 }
-/* 画面が低い端末では案内を出さない。
-   STAGE は縦に伸びない固定1画面なので、案内の分だけ盤面が押し上げられ、
-   「まず盤面を見せる」という案内自体の目的を潰してしまう。
-   実測: 320x568 で盤面上端が 23px 欠ける／375x667 でヘッダーへ 48px 食い込む。
-   780px 超で初めて余白が足りる（390x800 実測で食い込み 0）。
-   遊び方はヘッダーの ? から常に開けるので、情報は失われない。 */
-@media (max-height: 780px) {
+/* 案内を閉じた時などにフォーカスが移る先。指標が無いと移動先が分からないので戻す。
+   盤面は画面端まで使うため、外側に出さず内側へ描く（正のオフセットだとはみ出す）。 */
+.gp-stage:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -4px;
+  border-radius: var(--radius-sm);
+}
+
+/* 案内が出ている間だけ、盤面が少しだけ場所を譲る。
+   STAGE は縦に伸びない固定1画面なので、案内の高さはどこかから捻出するしかない。
+   「低い画面では案内を出さない」で逃げるとブラウザのURLバー分を引かれた実機の
+   モバイルがほぼ全て対象になり、初回訪問者に遊び方が届かなくなる（＝案内の存在意義が消える）。
+   盤面は主役なので譲り幅は最小限にとどめ、案内が消えれば元の寸法へ戻る。
+   案内は初回推測後も残るため、戻るのは決着時＝結果が盤面を覆う瞬間で、プレイ中は跳ねない。 */
+/* 案内を実際に出す高さでのみ譲る。:has() は display:none の要素にも一致するため、
+   下の非表示ルールと同じ境界で括らないと、案内が出ない画面まで盤面が縮んでしまう。 */
+@media (min-height: 601px) {
+  .gp-stage:has(.gp-coach) .gp-plate-frame {
+    width: min(58vw, 42dvh, 280px);
+  }
+  .gp-stage:has(.gp-coach) {
+    gap: var(--sp-2);
+  }
+}
+/* 案内自体も、盤面から借りる高さが最小になるよう詰める。 */
+.gp-coach {
+  padding-block: 0;
+}
+.gp-coach-text {
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+}
+/* 極端に低い場合だけは、盤面が譲っても収まらないので案内を出さない。
+   ここを高く取るとURLバー分を引かれた実機モバイルがほぼ全て対象になり、
+   初回訪問者に遊び方が届かなくなるため、あくまで下限として低く置く
+   （実測: 390x664＝iPhone相当の実効ビューポートでは表示され、食い込み0）。 */
+@media (max-height: 600px) {
   .gp-coach {
     display: none;
   }
