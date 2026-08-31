@@ -384,12 +384,16 @@ export default function Home() {
   }, [modal]);
 
   // 結果パネルの開閉は押したボタン自身を消すので、対になる要素へフォーカスを渡す。
+  // status も依存に要る。決着時は resultOpen が初期値の true から動かないため、
+  // resultOpen だけを見ていると再レンダが起きても このエフェクトが走らず、
+  // いちばん受け渡しが要る「最後の推測で決着した瞬間」だけ素通りしてしまう。
+  // 再訪時の復元では resultToggled が立たないので、勝手にフォーカスを奪わない。
   useEffect(() => {
     if (!resultToggled.current) return;
     resultToggled.current = false;
     if (resultOpen) resultRef.current?.focus();
     else resultReopenRef.current?.focus();
-  }, [resultOpen]);
+  }, [resultOpen, status]);
 
   const candidates = useMemo(() => {
     if (!munis) return [] as Muni[];
