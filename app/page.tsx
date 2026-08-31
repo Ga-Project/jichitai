@@ -451,6 +451,10 @@ export default function Home() {
     let st: "playing" | "won" | "lost" = "playing";
     if (g.isCorrect) st = "won";
     else if (next.length >= MAX_GUESSES) st = "lost";
+    // 決着すると、いま押したばかりの推測ボタンごとコマンドバーが消える。
+    // 利用者の操作で起きた消失なので、結果パネルへフォーカスを渡す合図を立てる
+    // （決着済みの日に再訪した時の初期表示では立てない＝勝手に奪わない）。
+    if (st !== "playing") resultToggled.current = true;
     setStatus(st);
     persist(next, st);
     // 決着したら、この場で確定した結果をそのまま戦績へ渡す。
@@ -770,8 +774,10 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 初回訪問の案内。盤面を隠さないよう、覆わずに直下へ添える。 */}
-        {coach && status === "playing" && (
+        {/* 初回訪問の案内。盤面を隠さないよう、覆わずに直下へ添える。
+            読み込みに失敗した時は出さない。盤面がエラーを出していて入力欄も無い
+            のに「6回以内で当てよう」だけが残ると、遊べない理由が読み取れない。 */}
+        {coach && status === "playing" && !loadError && (
           <div className="gp-coach">
             {/* 中段の高さは盤面と分け合うので、案内は2行に収まる長さに保つ。
                 距離と方角の説明はコンソールの一行と「遊び方」が担う。 */}
