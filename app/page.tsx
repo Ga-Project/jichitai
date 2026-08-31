@@ -784,15 +784,16 @@ export default function Home() {
         {coach && status === "playing" && !loadError && (
           <div className="gp-coach">
             {/* 中段の高さは盤面と分け合うので、案内は2行に収まる長さに保つ。
+                残り回数は HUD のピップとコンソールの一行が既に言っているので
+                重ねない。ここが担うのは「何を当てる遊びか」だけにする。
                 距離と方角の説明はコンソールの一行と「遊び方」が担う。 */}
             <p className="gp-coach-text">
-              このシルエットは<b>どこの市区町村</b>？<b>6回以内</b>で当てよう。
+              このシルエットは<b>どこの市区町村</b>？
             </p>
             <div className="gp-coach-actions">
               <button
                 type="button"
                 className="gp-coach-more"
-                aria-label="詳しい遊び方を見る"
                 onClick={() => setModal("help")}
               >
                 遊び方
@@ -813,8 +814,11 @@ export default function Home() {
           </div>
         )}
 
-        {/* コンパス座標の段階開示（ヒント）。盤面直下の計器列。 */}
-        {answer && status === "playing" && (
+        {/* コンパス座標の段階開示（ヒント）。盤面直下の計器列。
+            1回推測してから開く。ヒントは一度開くと閉じられない（開放専用）ので、
+            まだシルエットを見てもいない段階で盤面の真下に置くと、初回案内を閉じた
+            指がそのまま地方名を開けてしまう。段階開示は詰まってから使う道具。 */}
+        {answer && status === "playing" && guesses.length > 0 && (
           <div className="gp-hintrail" aria-label="座標ヒント">
             {hintRows.map((h, i) => {
               const prevOpen =

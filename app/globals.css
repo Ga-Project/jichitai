@@ -61,7 +61,10 @@
   --warn-tint: hsl(36 80% 94%);
   --err: #d92d20; /* エラー（対 bg AA） */
   --err-tint: hsl(4 78% 96%);
-  --focus: var(--accent);
+  /* フォーカスリングは面の上に前景として乗るので、塗りの --accent ではなく
+     文字用の --accent-ink を使う（dark の --accent は暗い面で 3.2:1 しかない）。
+     背景も枠も持たないボタンでは、リングが唯一の可視化手段になる。 */
+  --focus: var(--accent-ink);
 
   /* ===== typography（システムフォント優先・JP 対応・"使いこなす"） ===== */
   --font-sans:

@@ -326,6 +326,14 @@ body {
   min-width: 0;
   padding: var(--sp-2);
 }
+/* 盤面は本来ただの器なのでリングを出さない（上の outline:none）。ただし案内を
+   閉じた時など、消えた発火元の代わりにここへフォーカスを渡す導線があるので、
+   キーボード操作で来た時だけは着地点を見せる。汎用リングは outline-offset:2px
+   だが、中段いっぱいに広がる要素なので内側に引く。 */
+.gp-stage:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
 /* 盤面背面の緯線経線（地図感・極薄・装飾） */
 .gp-stage::before {
   content: "";
@@ -517,20 +525,21 @@ body {
   color: var(--text-soft);
 }
 
-/* 初回訪問の案内（盤面を覆わない一行。計器列と同じ素材感で盤面の続きに見せる）。
+/* 初回訪問の案内（盤面を覆わない一行）。
    中段の高さは 100dvh グリッドの残りしかなく、ここで使った分だけ盤面が縮む。
-   案内は「主役を押しのけない密度」を保つ: 折り返さず、本文と操作は常に横並び。 */
+   案内は「主役を押しのけない密度」を保つ: 2行までに収め、本文と操作は常に横並び。
+   装いは「注記」に寄せる。破線＋surface はこの製品では計器列（.gp-coordbtn）が
+   使っている「押せるもの」の記号なので、押せない案内が借りると、案内を閉じた
+   直後に同じ場所へ現れる計器列と見分けがつかなくなる。 */
 .gp-coach {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
   flex: none;
-  max-width: 34rem;
-  margin-inline: auto;
   padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
-  border: 1px dashed var(--text-dim);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--surface);
+  background: var(--surface-2);
   color: var(--text-soft);
 }
 .gp-coach-text {
@@ -571,19 +580,16 @@ body {
   min-width: 44px;
   color: var(--text-dim);
 }
-.gp-coach-more:hover,
-.gp-coach-close:hover {
+.gp-coach-more:hover {
   background: var(--accent-tint);
   color: var(--accent-ink-hover);
 }
-/* 中段の高さが足りない端末では、初回案内が出ている間だけ計器列を伏せる。
-   段階開示ヒントは詰まってから使うもので、まだ1回も推測していない初回訪問では
-   出番がない。案内と計器列を両方並べると盤面が潰れ、シルエットを最初に見せる
-   という初回訪問の狙い自体が失われる。案内は最初の推測で畳まれ、計器列は戻る。 */
-@media (max-height: 700px) {
-  .gp-stage:has(.gp-coach) .gp-hintrail {
-    display: none;
-  }
+/* 閉じるは離脱操作なので、主要操作のブランド色に寄せない
+   （隣の「遊び方」と hover 時に同化させない）。地が --surface-2 なので、
+   浮き上がりは --surface 側へ振る。 */
+.gp-coach-close:hover {
+  background: var(--surface);
+  color: var(--text);
 }
 
 /* コンパス座標ヒント（段階開示の計器列） */
