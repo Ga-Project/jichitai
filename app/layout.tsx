@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import Script from "next/script";
 import "./globals.css";
@@ -49,6 +49,8 @@ export const metadata: Metadata = {
   description:
     "今日のシルエットは何市？日本の市区町村を、距離と方角のヒントを頼りに6回以内で当てる毎日更新のブラウザゲーム。",
   applicationName: "ジチタイ",
+  // 自動生成のリンクは basePath が付かず 404 になるため、basePath 込みで明示する。
+  manifest: `${BASE_PATH}/manifest.webmanifest`,
   alternates: { canonical: SITE_URL },
   openGraph: {
     title: "ジチタイ — 毎日の市区町村シルエット当て",
@@ -69,6 +71,15 @@ export const metadata: Metadata = {
   },
 };
 
+// ブラウザのアドレスバー／ステータスバーの色。本体の背景色に揃え、
+// ダークモードでは本体の深い背景に揃える。
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fefefd" },
+    { media: "(prefers-color-scheme: dark)", color: "#16120e" },
+  ],
+};
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ja">
@@ -79,6 +90,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
         />
         {children}
+        <noscript>
+          ジチタイは、今日の市区町村のシルエットを距離と方角のヒントで6回以内に当てる毎日更新のゲームです。
+          遊ぶには JavaScript を有効にしてください。
+        </noscript>
         {GOATCOUNTER_CODE ? (
           <Script
             data-goatcounter={`https://${GOATCOUNTER_CODE}.goatcounter.com/count`}
