@@ -33,7 +33,7 @@ const JSON_LD = {
   "@context": "https://schema.org",
   "@type": "VideoGame",
   name: "ジチタイ",
-  alternateName: "ジチタイ — 毎日の市区町村シルエット当て",
+  alternateName: SITE_TITLE,
   url: SITE_URL,
   image: `${SITE_URL}${OG_IMAGE.url}`,
   description: SITE_DESCRIPTION,
@@ -55,7 +55,7 @@ export const metadata: Metadata = {
   manifest: `${BASE_PATH}/manifest.webmanifest`,
   alternates: { canonical: SITE_URL },
   openGraph: {
-    title: "ジチタイ — 毎日の市区町村シルエット当て",
+    title: SITE_TITLE,
     description:
       "今日のシルエットは何市？距離と方角のヒントを頼りに6回以内で当てよう。毎日0時に更新。",
     type: "website",
@@ -66,7 +66,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "ジチタイ — 毎日の市区町村シルエット当て",
+    title: SITE_TITLE,
     description:
       "今日のシルエットは何市？距離と方角のヒントを頼りに6回以内で当てよう。",
     images: [OG_IMAGE],
@@ -92,13 +92,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
         />
         {children}
-        <noscript>
-          <p className="jt-noscript" role="status">
-            {
-              "ジチタイは、今日の市区町村のシルエットを距離と方角のヒントで6回以内に当てる毎日更新のゲームです。遊ぶには JavaScript を有効にしてください（無効のままだと盤面は読み込まれません）。"
-            }
-          </p>
-        </noscript>
         {GOATCOUNTER_CODE ? (
           <Script
             data-goatcounter={`https://${GOATCOUNTER_CODE}.goatcounter.com/count`}

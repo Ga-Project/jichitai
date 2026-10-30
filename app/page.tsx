@@ -659,6 +659,15 @@ export default function Home() {
         推測の入力へスキップ
       </a>
 
+      {/* JavaScript 無効時の案内（盤面は読み込まれないため、理由を画面下端に固定表示する） */}
+      <noscript>
+        <p className="jt-noscript">
+          {
+            "ジチタイは、今日の市区町村のシルエットを距離と方角のヒントで6回以内に当てる毎日更新のゲームです。遊ぶには JavaScript を有効にしてください（無効のままだと盤面は読み込まれません）。"
+          }
+        </p>
+      </noscript>
+
       {/* ===== 上段 HUD: 探索ログのヘッダ計器（日付・お題番号・残量メーター） ===== */}
       <header className="gp-hud">
         <div className="gp-hud-id">
