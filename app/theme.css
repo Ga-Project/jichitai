@@ -1615,3 +1615,20 @@ body {
     transition: none !important;
   }
 }
+
+/* JavaScript 無効時の案内。body は overflow:hidden の全画面盤面なので、
+   画面下端に固定して必ず見えるようにする（盤面は読み込み待ちのまま止まるため）。 */
+.jt-noscript {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  margin: 0;
+  padding: var(--sp-4, 1rem) var(--sp-5, 1.25rem);
+  background: var(--surface);
+  color: var(--text);
+  border-top: 2px solid var(--accent);
+  font-size: var(--fs-sm, 0.9rem);
+  line-height: 1.6;
+}
