@@ -3,6 +3,12 @@ import type { ReactNode } from "react";
 import Script from "next/script";
 import "./globals.css";
 import "./theme.css";
+import {
+  BASE_PATH,
+  SITE_DESCRIPTION,
+  SITE_TITLE,
+  SITE_URL,
+} from "../lib/site.mjs";
 
 // 公開アナリティクス（cookieless・GoatCounter）。
 // 公開直前に NEXT_PUBLIC_GOATCOUNTER_CODE をビルド時に渡すとタグが有効化される
@@ -13,8 +19,6 @@ const GOATCOUNTER_CODE = process.env.NEXT_PUBLIC_GOATCOUNTER_CODE ?? "";
 // OGP 画像は絶対 URL でしか解決されないため、配信先を metadataBase に据える。
 // プロジェクトページ配信では basePath（/jichitai）配下に og.png が出るので、
 // 末尾スラッシュ付きの base に相対パス "og.png" を解決させて basePath 込みの URL を得る。
-const BASE_PATH = process.env.PAGES_BASE_PATH || "";
-const SITE_URL = `https://ga-project.github.io${BASE_PATH}/`;
 const OG_IMAGE = {
   url: "og.png",
   width: 1200,
@@ -32,8 +36,7 @@ const JSON_LD = {
   alternateName: "ジチタイ — 毎日の市区町村シルエット当て",
   url: SITE_URL,
   image: `${SITE_URL}${OG_IMAGE.url}`,
-  description:
-    "今日のシルエットは何市？日本の市区町村を、距離と方角のヒントを頼りに6回以内で当てる毎日更新のブラウザゲーム。",
+  description: SITE_DESCRIPTION,
   inLanguage: "ja",
   genre: "パズル・地理クイズ",
   applicationCategory: "GameApplication",
@@ -45,9 +48,8 @@ const JSON_LD = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "ジチタイ — 毎日の市区町村シルエット当て",
-  description:
-    "今日のシルエットは何市？日本の市区町村を、距離と方角のヒントを頼りに6回以内で当てる毎日更新のブラウザゲーム。",
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
   applicationName: "ジチタイ",
   // 自動生成のリンクは basePath が付かず 404 になるため、basePath 込みで明示する。
   manifest: `${BASE_PATH}/manifest.webmanifest`,
@@ -91,8 +93,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
         {children}
         <noscript>
-          ジチタイは、今日の市区町村のシルエットを距離と方角のヒントで6回以内に当てる毎日更新のゲームです。
-          遊ぶには JavaScript を有効にしてください。
+          <p className="jt-noscript" role="status">
+            {
+              "ジチタイは、今日の市区町村のシルエットを距離と方角のヒントで6回以内に当てる毎日更新のゲームです。遊ぶには JavaScript を有効にしてください（無効のままだと盤面は読み込まれません）。"
+            }
+          </p>
         </noscript>
         {GOATCOUNTER_CODE ? (
           <Script
